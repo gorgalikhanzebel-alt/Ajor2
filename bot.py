@@ -36,6 +36,15 @@ DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
 # ======== کلید هوش مصنوعی ========
 OPENROUTER_API_KEY = "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"
 
+# ======== جملات جدید برای زمانی که هوش مصنوعی جواب نده ========
+FUNNY_FALLBACKS = [
+    "چی میگی بچه خوشگل؟ 😏",
+    "سیک تو بزن تا سیکمو نزدن 😂",
+    "نمیفهمم حاجی چی میگی",
+    "این چرت و پرتا چیه میگی مردک 🤔",
+    "به نظرم ط ی چیزی زدی اینارو میگی"
+]
+
 # ======== توابع کمکی ========
 async def is_admin(user_id: int) -> bool:
     return user_id == ADMIN_ID
@@ -47,8 +56,8 @@ async def is_member(user_id: int) -> bool:
     except:
         return False
 
-async def ask_ai(query: str) -> str:
-    """پرسش از هوش مصنوعی با OpenRouter (رایگان و سبک)"""
+async def ask_ai_openrouter(query: str) -> str:
+    """پرسش از OpenRouter (رایگان و سبک)"""
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -71,6 +80,32 @@ async def ask_ai(query: str) -> str:
                     return None
     except Exception:
         return None
+
+async def ask_ai_nexra(query: str) -> str:
+    """پرسش از nexra.aryan.ir (روش قبلی)"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            url = f"https://api.nexra.aryan.ir/v1/chat/gpt?text={query}"
+            async with session.get(url, timeout=10) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data.get("status") == "success" and data.get("data"):
+                        return data["data"].strip()
+        return None
+    except:
+        return None
+
+async def ask_ai(query: str) -> str:
+    """ترکیبی از دو روش: اول OpenRouter، بعد nexra"""
+    result = await ask_ai_openrouter(query)
+    if result:
+        return result
+
+    result = await ask_ai_nexra(query)
+    if result:
+        return result
+
+    return None
 
 # ======== دیکشنری‌ها ========
 GREETINGS = {
@@ -380,7 +415,7 @@ async def admin_command(message: types.Message):
         return
     await message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
 
-# ======== پاسخ به پیام‌های متنی (با هوش مصنوعی) ========
+# ======== پاسخ به پیام‌های متنی (با دو روش هوش مصنوعی) ========
 @dp.message()
 async def handle_text(message: types.Message):
     if message.chat.type != "private":
@@ -394,18 +429,14 @@ async def handle_text(message: types.Message):
             await message.answer(response)
             return
 
-    # هوش مصنوعی
+    # هوش مصنوعی (ترکیبی از دو روش)
     ai_response = await ask_ai(text)
     if ai_response:
         await message.answer(ai_response)
         return
 
-    # اگر هوش مصنوعی جواب نداد، جوک یا نقل قول
-    fallback = random.choice([
-        random.choice(JOKES),
-        "💬 " + random.choice(QUOTES)
-    ])
-    await message.answer(fallback)
+    # اگر هیچکدوم جواب نداد، از جملات خنده‌دار استفاده کن
+    await message.answer(random.choice(FUNNY_FALLBACKS))
 
 # ======== پورت ========
 async def health_check(request):
