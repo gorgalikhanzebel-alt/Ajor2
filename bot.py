@@ -124,7 +124,7 @@ QUOTES = [
     "بهترین زمان برای شروع، الان است!"
 ]
 
-# ======== منوی اصلی (به شکل دلخواه شما) ========
+# ======== منوی اصلی (ReplyKeyboard - دکمه‌های پایین صفحه) ========
 def main_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -139,7 +139,7 @@ def main_menu():
         input_field_placeholder="یکی از گزینه‌های زیر را انتخاب کنید..."
     )
 
-# ======== منوی بازی (در صورت نیاز) ========
+# ======== منوهای دیگه (در صورت نیاز) ========
 def game_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -150,7 +150,6 @@ def game_menu():
         resize_keyboard=True
     )
 
-# ======== منوی ادمین (در صورت نیاز) ========
 def admin_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -239,15 +238,15 @@ async def download_link(message: types.Message):
     if not await is_member(message.from_user.id):
         await message.answer("❌ اول عضو کانال بشو!", reply_markup=channel_check_menu())
         return
-    await message.answer("🎬 لینک ویدیو یوتیوب یا اینستاگرام را بفرست:\n(فعلاً فقط یوتیوب پشتیبانی می‌شود)")
+    await message.answer("🎬 لینک ویدیو یوتیوب را بفرست:")
 
 @dp.message(lambda msg: msg.text == "💳 کیف پول")
 async def wallet(message: types.Message):
-    await message.answer("💳 کیف پول شما:\nموجودی: ۰ تومان\n\nاین بخش به زودی تکمیل می‌شود.")
+    await message.answer("💳 کیف پول شما:\nموجودی: ۰ تومان")
 
 @dp.message(lambda msg: msg.text == "🛒 خرید اشتراک")
 async def buy_subscription(message: types.Message):
-    await message.answer("🛒 لیست اشتراک‌ها:\n۱. اشتراک یک ماهه - ۱۰,۰۰۰ تومان\n۲. اشتراک سه ماهه - ۲۵,۰۰۰ تومان\n\nجهت خرید، گزینه مورد نظر را وارد کنید.")
+    await message.answer("🛒 لیست اشتراک‌ها:\n۱. یک ماهه - ۱۰,۰۰۰ تومان\n۲. سه ماهه - ۲۵,۰۰۰ تومان")
 
 @dp.message(lambda msg: msg.text == "📂 سفارشات")
 async def orders(message: types.Message):
@@ -256,23 +255,23 @@ async def orders(message: types.Message):
 @dp.message(lambda msg: msg.text == "👤 حساب کاربری")
 async def profile_button(message: types.Message):
     user = message.from_user
-    await message.answer(f"👤 نام: {user.full_name}\n🆔 آیدی: {user.id}\n📱 شماره: ثبت نشده")
+    await message.answer(f"👤 نام: {user.full_name}\n🆔 آیدی: {user.id}")
 
 @dp.message(lambda msg: msg.text == "🎁 دعوت دوستان")
 async def invite_friends(message: types.Message):
     bot_info = await bot.get_me()
     link = f"https://t.me/{bot_info.username}?start=ref_{message.from_user.id}"
-    await message.answer(f"🎁 لینک دعوت شما:\n<code>{link}</code>\n\nبا دعوت دوستان، از امتیاز ویژه برخوردار شوید!", parse_mode="HTML")
+    await message.answer(f"🎁 لینک دعوت شما:\n<code>{link}</code>", parse_mode="HTML")
 
 @dp.message(lambda msg: msg.text == "📢 کانال")
 async def channel_button(message: types.Message):
-    await message.answer(f"📢 کانال ما:\n{CHANNEL_LINK}\n\nبرای عضویت کلیک کنید.")
+    await message.answer(f"📢 کانال ما:\n{CHANNEL_LINK}")
 
 @dp.message(lambda msg: msg.text == "🛠 پشتیبانی")
 async def support(message: types.Message):
-    await message.answer("🛠 پشتیبانی:\nبرای ارتباط با ادمین، به آیدی زیر پیام دهید:\n@AdminUsername")
+    await message.answer("🛠 پشتیبانی:\n@AdminUsername")
 
-# ======== دکمه‌های بازی (که در صورت نیاز از منو قابل دسترسی است) ========
+# ======== دکمه‌های بازی ========
 @dp.message(lambda msg: msg.text == "🎲 تاس")
 async def dice_button(message: types.Message):
     await message.answer_dice(emoji="🎲")
@@ -296,9 +295,9 @@ async def back_button(message: types.Message):
 @dp.message(lambda msg: msg.text == "📤 آپلود فایل")
 async def upload_button(message: types.Message):
     if not await is_admin(message.from_user.id):
-        await message.answer("⛔ فقط ادمین می‌تواند فایل آپلود کند!")
+        await message.answer("⛔ فقط ادمین!")
         return
-    await message.answer("📤 لطفاً فایل (عکس، ویدئو، سند) را ارسال کنید.")
+    await message.answer("📤 لطفاً فایل را ارسال کنید.")
 
 @dp.message(lambda msg: msg.text == "📊 آمار کاربران")
 async def stats_button(message: types.Message):
@@ -306,13 +305,13 @@ async def stats_button(message: types.Message):
         await message.answer("⛔ فقط ادمین!")
         return
     count = users_col.count_documents({})
-    await message.answer(f"📊 تعداد کاربران ثبت‌شده: {count}")
+    await message.answer(f"📊 تعداد کاربران: {count}")
 
-# ======== دریافت فایل (برای آپلود) ========
+# ======== دریافت فایل ========
 @dp.message(lambda msg: msg.document or msg.photo or msg.video)
 async def handle_file_upload(message: types.Message):
     if not await is_admin(message.from_user.id):
-        await message.answer("⛔ فقط ادمین می‌تواند فایل آپلود کند!")
+        await message.answer("⛔ فقط ادمین!")
         return
     if message.document:
         file_id = message.document.file_id
@@ -342,13 +341,11 @@ async def handle_file_upload(message: types.Message):
     bot_info = await bot.get_me()
     link = f"https://t.me/{bot_info.username}?start=file_{file_uuid}"
     await message.answer(
-        f"✅ فایل با موفقیت آپلود شد!\n\n"
-        f"🔗 لینک اختصاصی:\n<code>{link}</code>\n\n"
-        f"📌 کپشن فایل:\n{caption}",
+        f"✅ فایل آپلود شد!\n\n🔗 لینک:\n<code>{link}</code>",
         parse_mode="HTML"
     )
 
-# ======== دانلود یوتیوب (دریافت لینک از کاربر) ========
+# ======== دانلود یوتیوب ========
 @dp.message(lambda msg: msg.text and ("youtube.com" in msg.text or "youtu.be" in msg.text))
 async def get_youtube(message: types.Message):
     if not await is_member(message.from_user.id):
@@ -367,15 +364,9 @@ async def get_youtube(message: types.Message):
 # ======== دستورات ========
 @dp.message(Command("help"))
 async def help_command(message: types.Message):
-    await message.answer(
-        "📖 راهنمای ربات:\n"
-        "از دکمه‌های منوی اصلی استفاده کنید.\n"
-        "دستورات خاص:\n"
-        "/start - شروع\n"
-        "/help - این پیام"
-    )
+    await message.answer("📖 از دکمه‌های منوی اصلی استفاده کنید.")
 
-# ======== پاسخ به پیام‌های متنی (غیر از دکمه‌ها و دستورات) ========
+# ======== پاسخ به پیام‌های متنی ========
 @dp.message()
 async def handle_text(message: types.Message):
     if message.chat.type != "private":
@@ -383,23 +374,19 @@ async def handle_text(message: types.Message):
     user_id = message.from_user.id
     if not await is_member(user_id):
         await message.answer(
-            "❌ شما عضو کانال ما نیستی!\n"
-            "لطفاً اول عضو کانال بشو تا بتوانی از ربات استفاده کنی.",
+            "❌ عضو کانال نیستی!",
             reply_markup=channel_check_menu()
         )
         return
     text = message.text.strip().lower()
-    # پاسخ به سلام
     for key, response in GREETINGS.items():
         if key in text:
             await message.answer(response)
             return
-    # هوش مصنوعی
     ai_response = await ask_ai(text)
     if ai_response:
         await message.answer(ai_response)
         return
-    # جملات خنده‌دار
     await message.answer(random.choice(FUNNY_FALLBACKS))
 
 # ======== پورت ========
