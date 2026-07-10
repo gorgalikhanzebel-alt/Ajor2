@@ -18,7 +18,6 @@ if not TOKEN or not MONGO_URI:
     logging.error("❌ متغیرهای محیطی تنظیم نشده‌اند!")
     exit(1)
 
-# ======== اتصال به دیتابیس ========
 client = MongoClient(MONGO_URI)
 db = client["telegram_bot"]
 users_col = db["users"]
@@ -66,13 +65,17 @@ GREETINGS = {
 JOKES = [
     "چرا مرغ از جاده رد شد؟ برای اینکه به اون طرف برسه! 😂",
     "بهترین زبان برنامه‌نویسی؟ پایتون! 🐍",
-    "یک پنگوئن به یخچال نگاه کرد و گفت: چقدر خنک! 😄"
+    "یک پنگوئن به یخچال نگاه کرد و گفت: چقدر خنک! 😄",
+    "چرا ریاضیات غمگینه؟ چون مسائلش بی‌جوابه!",
+    "چی می‌شه اگه نارگیل رو بندازی تو رودخونه؟ آب می‌شه!"
 ]
 
 QUOTES = [
     "همیشه به فکر فردا باش!",
     "موفقیت یعنی بلند شدن دوباره!",
-    "کد بزن و لذت ببر!"
+    "کد بزن و لذت ببر!",
+    "زندگی مثل یه جعبه شکلاته!",
+    "بهترین زمان برای شروع، الان است!"
 ]
 
 # ======== منوها ========
@@ -116,11 +119,9 @@ async def start(message: types.Message):
     user_id = message.from_user.id
     name = message.from_user.first_name
 
-    # ذخیره کاربر در دیتابیس
     if not users_col.find_one({"_id": user_id}):
         users_col.insert_one({"_id": user_id, "name": name})
 
-    # بررسی عضویت در کانال
     if not await is_member(user_id):
         await message.answer(
             f"👋 سلام {name}!\n"
@@ -227,7 +228,45 @@ async def stats(callback: types.CallbackQuery):
     await callback.message.answer(f"📊 تعداد کاربران ثبت‌شده: {count}")
     await callback.answer()
 
-# ======== پاسخ به پیام‌های متنی ========
+# ======== دستورات جدید ========
+@dp.message(Command("help"))
+async def help_command(message: types.Message):
+    await message.answer(
+        "📖 لیست دستورات:\n"
+        "/start - شروع و منوی اصلی\n"
+        "/help - نمایش راهنما\n"
+        "/profile - پروفایل شما\n"
+        "/time - ساعت و تاریخ\n"
+        "/joke - جوک تصادفی\n"
+        "/quote - نقل قول انگیزشی\n"
+        "/admin - پنل ادمین"
+    )
+
+@dp.message(Command("profile"))
+async def profile(message: types.Message):
+    await message.answer(f"👤 نام: {message.from_user.full_name}\n🆔 آیدی: {message.from_user.id}")
+
+@dp.message(Command("time"))
+async def time_command(message: types.Message):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    await message.answer(f"🕒 {now}")
+
+@dp.message(Command("joke"))
+async def joke(message: types.Message):
+    await message.answer(random.choice(JOKES))
+
+@dp.message(Command("quote"))
+async def quote(message: types.Message):
+    await message.answer(f"💬 {random.choice(QUOTES)}")
+
+@dp.message(Command("admin"))
+async def admin_command(message: types.Message):
+    if not await is_admin(message.from_user.id):
+        await message.answer("⛔ شما دسترسی به پنل ادمین ندارید!")
+        return
+    await message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
+
+# ======== پاسخ به پیام‌های متنی (غیر از دستورات) ========
 @dp.message()
 async def handle_text(message: types.Message):
     if message.chat.type != "private":
@@ -247,7 +286,7 @@ async def handle_text(message: types.Message):
         await message.answer(ai_response)
         return
 
-    # جوک یا نقل قول
+    # جوک یا نقل قول (پیش‌فرض)
     fallback = random.choice([
         random.choice(JOKES),
         "💬 " + random.choice(QUOTES)
