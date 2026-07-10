@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pymongo import MongoClient
 from aiohttp import web
 from pytube import YouTube
@@ -29,7 +29,7 @@ dp = Dispatcher()
 logging.basicConfig(level=logging.INFO)
 
 ADMIN_ID = int(os.getenv("ADMIN_ID", 466050034))
-CHANNEL_ID = -1001277492702
+CHANNEL_ID = -1001277492702  # آیدی عددی کانال @ajor_pareh
 CHANNEL_LINK = "https://t.me/ajor_pareh"
 DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
 
@@ -49,10 +49,12 @@ async def is_admin(user_id: int) -> bool:
     return user_id == ADMIN_ID
 
 async def is_member(user_id: int) -> bool:
+    """بررسی عضویت کاربر در کانال"""
     try:
         member = await bot.get_chat_member(CHANNEL_ID, user_id)
         return member.status in ["member", "administrator", "creator"]
-    except:
+    except Exception as e:
+        logging.error(f"Error checking membership: {e}")
         return False
 
 async def ask_ai_openrouter(query: str) -> str:
@@ -74,7 +76,7 @@ async def ask_ai_openrouter(query: str) -> str:
                     result = await resp.json()
                     return result['choices'][0]['message']['content']
                 return None
-    except:
+    except Exception:
         return None
 
 async def ask_ai_nexra(query: str) -> str:
@@ -87,7 +89,7 @@ async def ask_ai_nexra(query: str) -> str:
                     if data.get("status") == "success" and data.get("data"):
                         return data["data"].strip()
         return None
-    except:
+    except Exception:
         return None
 
 async def ask_ai(query: str) -> str:
@@ -124,17 +126,34 @@ QUOTES = [
     "بهترین زمان برای شروع، الان است!"
 ]
 
-# ======== منوهای شیشه‌ای (InlineKeyboard) ========
+# ======== منوها ========
 def main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📥 دانلود از لینک", callback_data="download")],
-        [InlineKeyboardButton(text="💳 کیف پول", callback_data="wallet"), 
-         InlineKeyboardButton(text="🛒 خرید اشتراک", callback_data="buy")],
-        [InlineKeyboardButton(text="📂 سفارشات", callback_data="orders"), 
-         InlineKeyboardButton(text="👤 حساب کاربری", callback_data="profile")],
-        [InlineKeyboardButton(text="🎁 دعوت دوستان", callback_data="invite"), 
-         InlineKeyboardButton(text="📢 کانال", callback_data="channel")],
-        [InlineKeyboardButton(text="🛠 پشتیبانی", callback_data="support")]
+        [InlineKeyboardButton(text="🎬 دانلود یوتیوب", callback_data="youtube")],
+        [InlineKeyboardButton(text="🎮 بازی و سرگرمی", callback_data="game")],
+        [InlineKeyboardButton(text="⚙️ پنل ادمین", callback_data="admin_panel")]
+    ])
+
+def game_menu():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎲 تاس", callback_data="dice"),
+         InlineKeyboardButton(text="🎯 دارت", callback_data="dart")],
+        [InlineKeyboardButton(text="🪨 سنگ‌کاغذ‌قیچی", callback_data="rps")],
+        [InlineKeyboardButton(text="🔙 برگشت", callback_data="back_main")]
+    ])
+
+def rps_menu():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🪨 سنگ", callback_data="rps_stone")],
+        [InlineKeyboardButton(text="📄 کاغذ", callback_data="rps_paper")],
+        [InlineKeyboardButton(text="✂️ قیچی", callback_data="rps_scissors")]
+    ])
+
+def admin_menu():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📊 آمار کاربران", callback_data="stats")],
+        [InlineKeyboardButton(text="📤 آپلود فایل", callback_data="upload_file")],
+        [InlineKeyboardButton(text="🔙 برگشت", callback_data="back_main")]
     ])
 
 def channel_check_menu():
@@ -143,15 +162,7 @@ def channel_check_menu():
         [InlineKeyboardButton(text="✅ عضویت داشتم", callback_data="check_join")]
     ])
 
-# ======== تنظیم دستورات (منوی پایین ربات) ========
-async def set_commands():
-    commands = [
-        BotCommand(command="start", description="شروع و منوی اصلی"),
-        BotCommand(command="help", description="راهنما"),
-    ]
-    await bot.set_my_commands(commands)
-
-# ======== دستور /start ========
+# ======== دستور /start با ممبرگیر قوی ========
 @dp.message(Command("start"))
 async def start(message: types.Message):
     user_id = message.from_user.id
@@ -169,9 +180,11 @@ async def start(message: types.Message):
                     reply_markup=channel_check_menu()
                 )
                 return
+            
             file_id = file_data["file_id"]
             file_type = file_data["type"]
             caption = file_data.get("caption", DEFAULT_CAPTION)
+            
             if file_type == "photo":
                 await message.answer_photo(file_id, caption=caption)
             elif file_type == "video":
@@ -180,14 +193,14 @@ async def start(message: types.Message):
                 await message.answer_document(file_id, caption=caption)
             return
         else:
-            await message.answer("❌ فایل مورد نظر یافت نشد.")
+            await message.answer("❌ فایل مورد نظر یافت نشد. ممکن است منقضی شده باشد.")
             return
 
-    # ذخیره کاربر
+    # ذخیره کاربر در دیتابیس
     if not users_col.find_one({"_id": user_id}):
         users_col.insert_one({"_id": user_id, "name": name})
 
-    # بررسی عضویت
+    # بررسی عضویت در کانال (ممبرگیر)
     if not await is_member(user_id):
         await message.answer(
             f"👋 سلام {name}!\n"
@@ -198,7 +211,7 @@ async def start(message: types.Message):
 
     await message.answer(
         f"🚀 سلام {name}!\n"
-        "به ربات خوش آمدی. از دکمه‌های زیر استفاده کن:",
+        "به ربات خوش آمدی.",
         reply_markup=main_menu()
     )
 
@@ -212,55 +225,19 @@ async def check_join(callback: types.CallbackQuery):
     else:
         await callback.answer("❌ هنوز عضو کانال نشدی! اول عضو شو.", show_alert=True)
 
-# ======== کالبک‌های منوی اصلی ========
-@dp.callback_query(lambda c: c.data == "download")
-async def download_callback(callback: types.CallbackQuery):
+# ======== دانلود یوتیوب ========
+@dp.callback_query(lambda c: c.data == "youtube")
+async def youtube(callback: types.CallbackQuery):
+    if not await is_member(callback.from_user.id):
+        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
+        return
     await callback.message.answer("🎬 لینک ویدیو یوتیوب را بفرست:")
     await callback.answer()
 
-@dp.callback_query(lambda c: c.data == "wallet")
-async def wallet_callback(callback: types.CallbackQuery):
-    await callback.message.answer("💳 کیف پول شما:\nموجودی: ۰ تومان")
-    await callback.answer()
-
-@dp.callback_query(lambda c: c.data == "buy")
-async def buy_callback(callback: types.CallbackQuery):
-    await callback.message.answer("🛒 لیست اشتراک‌ها:\n۱. یک ماهه - ۱۰,۰۰۰ تومان\n۲. سه ماهه - ۲۵,۰۰۰ تومان")
-    await callback.answer()
-
-@dp.callback_query(lambda c: c.data == "orders")
-async def orders_callback(callback: types.CallbackQuery):
-    await callback.message.answer("📂 لیست سفارشات شما:\nهنوز سفارشی ثبت نشده است.")
-    await callback.answer()
-
-@dp.callback_query(lambda c: c.data == "profile")
-async def profile_callback(callback: types.CallbackQuery):
-    user = callback.from_user
-    await callback.message.answer(f"👤 نام: {user.full_name}\n🆔 آیدی: {user.id}")
-    await callback.answer()
-
-@dp.callback_query(lambda c: c.data == "invite")
-async def invite_callback(callback: types.CallbackQuery):
-    bot_info = await bot.get_me()
-    link = f"https://t.me/{bot_info.username}?start=ref_{callback.from_user.id}"
-    await callback.message.answer(f"🎁 لینک دعوت شما:\n<code>{link}</code>", parse_mode="HTML")
-    await callback.answer()
-
-@dp.callback_query(lambda c: c.data == "channel")
-async def channel_callback(callback: types.CallbackQuery):
-    await callback.message.answer(f"📢 کانال ما:\n{CHANNEL_LINK}")
-    await callback.answer()
-
-@dp.callback_query(lambda c: c.data == "support")
-async def support_callback(callback: types.CallbackQuery):
-    await callback.message.answer("🛠 پشتیبانی:\n@AdminUsername")
-    await callback.answer()
-
-# ======== دانلود یوتیوب ========
 @dp.message(lambda msg: msg.text and ("youtube.com" in msg.text or "youtu.be" in msg.text))
 async def get_youtube(message: types.Message):
     if not await is_member(message.from_user.id):
-        await message.answer("❌ اول عضو کانال بشو!", reply_markup=channel_check_menu())
+        await message.answer("❌ اول عضو کانال بشو!")
         return
     try:
         yt = YouTube(message.text)
@@ -272,12 +249,107 @@ async def get_youtube(message: types.Message):
     except:
         await message.answer("❌ خطا! لینک معتبر نیست.")
 
-# ======== آپلود فایل (فقط ادمین) ========
+# ======== بازی‌ها ========
+@dp.callback_query(lambda c: c.data == "game")
+async def game(callback: types.CallbackQuery):
+    if not await is_member(callback.from_user.id):
+        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
+        return
+    await callback.message.answer("🎮 یک بازی انتخاب کن:", reply_markup=game_menu())
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data == "dice")
+async def dice(callback: types.CallbackQuery):
+    if not await is_member(callback.from_user.id):
+        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
+        return
+    await callback.message.answer_dice(emoji="🎲")
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data == "dart")
+async def dart(callback: types.CallbackQuery):
+    if not await is_member(callback.from_user.id):
+        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
+        return
+    await callback.message.answer_dice(emoji="🎯")
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data == "rps")
+async def rps(callback: types.CallbackQuery):
+    if not await is_member(callback.from_user.id):
+        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
+        return
+    await callback.message.answer("🪨 یکی رو انتخاب کن:", reply_markup=rps_menu())
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data in ["rps_stone", "rps_paper", "rps_scissors"])
+async def rps_play(callback: types.CallbackQuery):
+    if not await is_member(callback.from_user.id):
+        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
+        return
+    choices = {
+        "rps_stone": {"name": "🪨 سنگ", "beats": "rps_scissors"},
+        "rps_paper": {"name": "📄 کاغذ", "beats": "rps_stone"},
+        "rps_scissors": {"name": "✂️ قیچی", "beats": "rps_paper"}
+    }
+    user_choice = callback.data
+    bot_choice = random.choice(list(choices.keys()))
+    user_emoji = choices[user_choice]["name"]
+    bot_emoji = choices[bot_choice]["name"]
+    if user_choice == bot_choice:
+        result = "🤝 مساوی!"
+    elif choices[user_choice]["beats"] == bot_choice:
+        result = "🎉 بردی!"
+    else:
+        result = "😢 باختی!"
+    await callback.message.answer(f"تو: {user_emoji}\nربات: {bot_emoji}\n\n{result}")
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data == "back_main")
+async def back_main(callback: types.CallbackQuery):
+    await callback.message.answer("🔙 منوی اصلی:", reply_markup=main_menu())
+    await callback.answer()
+
+# ======== پنل ادمین ========
+@dp.callback_query(lambda c: c.data == "admin_panel")
+async def admin_panel(callback: types.CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return
+    await callback.message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data == "stats")
+async def stats(callback: types.CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return
+    count = users_col.count_documents({})
+    await callback.message.answer(f"📊 تعداد کاربران ثبت‌شده: {count}")
+    await callback.answer()
+
+# ======== آپلود فایل ========
+@dp.callback_query(lambda c: c.data == "upload_file")
+async def upload_file_callback(callback: types.CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return
+    await callback.message.answer("📤 لطفاً فایل (عکس، ویدئو، سند) را ارسال کنید.\nبرای کپشن دلخواه، هنگام ارسال فایل، در قسمت کپشن بنویسید.")
+    await callback.answer()
+
+@dp.message(Command("upload"))
+async def upload_file_command(message: types.Message):
+    if not await is_admin(message.from_user.id):
+        await message.answer("⛔ فقط ادمین می‌تواند فایل آپلود کند!")
+        return
+    await message.answer("📤 لطفاً فایل (عکس، ویدئو، سند) را ارسال کنید.\nبرای کپشن دلخواه، هنگام ارسال فایل، در قسمت کپشن بنویسید.")
+
 @dp.message(lambda msg: msg.document or msg.photo or msg.video)
 async def handle_file_upload(message: types.Message):
     if not await is_admin(message.from_user.id):
         await message.answer("⛔ فقط ادمین می‌تواند فایل آپلود کند!")
         return
+
     if message.document:
         file_id = message.document.file_id
         file_type = "document"
@@ -293,8 +365,10 @@ async def handle_file_upload(message: types.Message):
     else:
         await message.answer("❌ نوع فایل پشتیبانی نمی‌شود.")
         return
+
     file_uuid = str(uuid.uuid4())[:8]
     caption = message.caption if message.caption else DEFAULT_CAPTION
+
     files_col.insert_one({
         "uuid": file_uuid,
         "file_id": file_id,
@@ -303,39 +377,94 @@ async def handle_file_upload(message: types.Message):
         "caption": caption,
         "uploaded_at": datetime.now()
     })
+
     bot_info = await bot.get_me()
     link = f"https://t.me/{bot_info.username}?start=file_{file_uuid}"
+
     await message.answer(
-        f"✅ فایل با موفقیت آپلود شد!\n\n🔗 لینک اختصاصی:\n<code>{link}</code>",
+        f"✅ فایل با موفقیت آپلود شد!\n\n"
+        f"🔗 لینک اختصاصی:\n<code>{link}</code>\n\n"
+        f"📌 کپشن فایل:\n{caption}\n\n"
+        f"⚠️ کاربران ابتدا باید عضو کانال شوند تا فایل را دریافت کنند.",
         parse_mode="HTML"
     )
 
 # ======== دستورات ========
 @dp.message(Command("help"))
 async def help_command(message: types.Message):
-    await message.answer("📖 از دکمه‌های منوی اصلی استفاده کنید.")
+    await message.answer(
+        "📖 لیست دستورات:\n"
+        "/start - شروع و منوی اصلی\n"
+        "/help - نمایش راهنما\n"
+        "/profile - پروفایل شما\n"
+        "/time - ساعت و تاریخ\n"
+        "/joke - جوک تصادفی\n"
+        "/quote - نقل قول انگیزشی\n"
+        "/ping - بررسی وضعیت ربات\n"
+        "/upload - آپلود فایل (فقط ادمین)\n"
+        "/admin - پنل ادمین"
+    )
+
+@dp.message(Command("profile"))
+async def profile(message: types.Message):
+    await message.answer(f"👤 نام: {message.from_user.full_name}\n🆔 آیدی: {message.from_user.id}")
+
+@dp.message(Command("time"))
+async def time_command(message: types.Message):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    await message.answer(f"🕒 {now}")
+
+@dp.message(Command("joke"))
+async def joke(message: types.Message):
+    await message.answer(random.choice(JOKES))
+
+@dp.message(Command("quote"))
+async def quote(message: types.Message):
+    await message.answer(f"💬 {random.choice(QUOTES)}")
+
+@dp.message(Command("ping"))
+async def ping(message: types.Message):
+    await message.answer("✅ ربات آنلاین و سالم است!")
+
+@dp.message(Command("admin"))
+async def admin_command(message: types.Message):
+    if not await is_admin(message.from_user.id):
+        await message.answer("⛔ شما دسترسی به پنل ادمین ندارید!")
+        return
+    await message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
 
 # ======== پاسخ به پیام‌های متنی ========
 @dp.message()
 async def handle_text(message: types.Message):
     if message.chat.type != "private":
         return
+
     user_id = message.from_user.id
+
+    # اول بررسی کن که کاربر عضو کانال هست یا نه
     if not await is_member(user_id):
         await message.answer(
-            "❌ شما عضو کانال ما نیستی! لطفاً اول عضو شو.",
+            "❌ شما عضو کانال ما نیستی!\n"
+            "لطفاً اول عضو کانال بشو تا بتوانی از ربات استفاده کنی.",
             reply_markup=channel_check_menu()
         )
         return
+
     text = message.text.strip().lower()
+    
+    # پاسخ به سلام
     for key, response in GREETINGS.items():
         if key in text:
             await message.answer(response)
             return
+
+    # هوش مصنوعی
     ai_response = await ask_ai(text)
     if ai_response:
         await message.answer(ai_response)
         return
+
+    # جملات خنده‌دار
     await message.answer(random.choice(FUNNY_FALLBACKS))
 
 # ======== پورت ========
@@ -354,7 +483,6 @@ async def start_web():
 
 async def main():
     await start_web()
-    await set_commands()
     logging.info("🤖 Starting bot...")
     await dp.start_polling(bot, skip_updates=True)
 
