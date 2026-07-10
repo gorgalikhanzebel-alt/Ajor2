@@ -4,7 +4,7 @@ import logging
 import random
 import aiohttp
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions
@@ -44,35 +44,35 @@ FUNNY_FALLBACKS = [
     "به نظرم ط ی چیزی زدی اینارو میگی"
 ]
 
-# ======== ۵ جوک جدید ========
+# ======== جوک‌ها ========
 JOKES = [
     "چرا مرغ از جاده رد شد؟ برای اینکه به اون طرف برسه! 😂",
     "بهترین زبان برنامه‌نویسی؟ پایتون! 🐍",
     "یک پنگوئن به یخچال نگاه کرد و گفت: چقدر خنک! 😄",
     "چرا ریاضیات غمگینه؟ چون مسائلش بی‌جوابه!",
     "چی می‌شه اگه نارگیل رو بندازی تو رودخونه؟ آب می‌شه!",
-    "یک گربه به کامپیوتر گفت: منوس! 😹",  # جدید
-    "چرا برنامه‌نویس‌ها عاشق قهوه‌ان؟ چون coffee رو با class constructor یکی می‌دونن! ☕",  # جدید
-    "بهترین شوخی برنامه‌نویسی؟ null pointer exception! 😂",  # جدید
-    "چرا تابع main همیشه اول میاد؟ چون مامانش گفته! 😄",  # جدید
-    "تفاوت بین یه برنامه‌نویس و یه هنرمند؟ یکی باگ می‌نویسه، یکی نقاشی! 🎨"  # جدید
+    "یک گربه به کامپیوتر گفت: منوس! 😹",
+    "چرا برنامه‌نویس‌ها عاشق قهوه‌ان؟ چون coffee رو با class constructor یکی می‌دونن! ☕",
+    "بهترین شوخی برنامه‌نویسی؟ null pointer exception! 😂",
+    "چرا تابع main همیشه اول میاد؟ چون مامانش گفته! 😄",
+    "تفاوت بین یه برنامه‌نویس و یه هنرمند؟ یکی باگ می‌نویسه، یکی نقاشی! 🎨"
 ]
 
-# ======== ۵ نقل قول انگیزشی جدید ========
+# ======== نقل قول‌ها ========
 QUOTES = [
     "همیشه به فکر فردا باش!",
     "موفقیت یعنی بلند شدن دوباره!",
     "کد بزن و لذت ببر!",
     "زندگی مثل یه جعبه شکلاته!",
     "بهترین زمان برای شروع، الان است!",
-    "هیچ چیز غیرممکن نیست، فقط زمان می‌بره! ⏳",  # جدید
-    "با امید و تلاش، قله‌ها فتح می‌شوند! 🏔️",  # جدید
-    "لبخند بزن، دنیا لبخند می‌زند! 😊",  # جدید
-    "هر روز یه فرصت تازه برای شروع دوباره است! 🌅",  # جدید
-    "موفقیت یعنی بلند شدن هر بار که زمین می‌خوری! 💪"  # جدید
+    "هیچ چیز غیرممکن نیست، فقط زمان می‌بره! ⏳",
+    "با امید و تلاش، قله‌ها فتح می‌شوند! 🏔️",
+    "لبخند بزن، دنیا لبخند می‌زند! 😊",
+    "هر روز یه فرصت تازه برای شروع دوباره است! 🌅",
+    "موفقیت یعنی بلند شدن هر بار که زمین می‌خوری! 💪"
 ]
 
-# ======== ۱۰ کلمه جدید برای احوال‌پرسی ========
+# ======== احوال‌پرسی ========
 GREETINGS = {
     "سلام": "سلام! 👋",
     "خوبی": "خوبم ممنون! تو چطوری؟",
@@ -82,19 +82,22 @@ GREETINGS = {
     "صبح بخیر": "صبح بخیر! ☀️",
     "شب بخیر": "شب بخیر! 🌙",
     "خوش اومدی": "خوش اومدی! ✨",
-    "چه خبر": "سلامت باشی! 😊",  # جدید
-    "خوشحالم": "منم خوشحالم! 😄",  # جدید
-    "علیک": "علیک السلام! 🙏",  # جدید
-    "درود": "درود بر تو! 🌹",  # جدید
-    "ایول": "ایول داش! 🔥",  # جدید
-    "دمت گرم": "دمت گرم داداش! ❤️",  # جدید
-    "چاکرم": "چاکرم استاد! 🙌",  # جدید
-    "سپاس": "سپاسگزارم! 🌺",  # جدید
-    "متشکرم": "خواهش می‌کنم! 🌸",  # جدید
-    "بله": "چشم! ✅",  # جدید
-    "نه": "نه جان؟ 😅",  # جدید
-    "باشه": "باشه عزیزم! 😊"  # جدید
+    "چه خبر": "سلامت باشی! 😊",
+    "خوشحالم": "منم خوشحالم! 😄",
+    "علیک": "علیک السلام! 🙏",
+    "درود": "درود بر تو! 🌹",
+    "ایول": "ایول داش! 🔥",
+    "دمت گرم": "دمت گرم داداش! ❤️",
+    "چاکرم": "چاکرم استاد! 🙌",
+    "سپاس": "سپاسگزارم! 🌺",
+    "متشکرم": "خواهش می‌کنم! 🌸",
+    "بله": "چشم! ✅",
+    "نه": "نه جان؟ 😅",
+    "باشه": "باشه عزیزم! 😊"
 }
+
+# ======== ذخیره‌سازی بازی حدس عدد ========
+guess_games = {}
 
 # ======== توابع کمکی ========
 async def is_admin(user_id: int) -> bool:
@@ -151,7 +154,11 @@ async def ask_ai(query: str) -> str:
         return result
     return None
 
-# ======== منوهای جدید ========
+# ======== تابع زمان تهران (UTC+3:30) ========
+def get_tehran_time():
+    return datetime.now(timezone.utc) + timedelta(hours=3, minutes=30)
+
+# ======== منوها ========
 def main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🎬 دانلود یوتیوب", callback_data="youtube")],
@@ -168,7 +175,7 @@ def game_menu():
         [InlineKeyboardButton(text="🎲 تاس", callback_data="dice"),
          InlineKeyboardButton(text="🎯 دارت", callback_data="dart")],
         [InlineKeyboardButton(text="🪨 سنگ‌کاغذ‌قیچی", callback_data="rps")],
-        [InlineKeyboardButton(text="🎯 حدس عدد", callback_data="guess_game")],
+        [InlineKeyboardButton(text="🔢 حدس عدد", callback_data="guess_game")],
         [InlineKeyboardButton(text="🪙 شیر یا خط", callback_data="coin_flip")],
         [InlineKeyboardButton(text="🔙 برگشت", callback_data="back_main")]
     ])
@@ -285,7 +292,7 @@ async def get_youtube(message: types.Message):
     except:
         await message.answer("❌ خطا! لینک معتبر نیست.")
 
-# ======== دکمه‌های جدید منوی اصلی ========
+# ======== دکمه‌های منوی اصلی ========
 @dp.callback_query(lambda c: c.data == "wallet")
 async def wallet_callback(callback: types.CallbackQuery):
     await callback.message.answer("💳 کیف پول شما:\nموجودی: ۰ تومان\n\nاین بخش به زودی تکمیل می‌شود.")
@@ -363,18 +370,55 @@ async def rps_play(callback: types.CallbackQuery):
     await callback.message.answer(f"تو: {user_emoji}\nربات: {bot_emoji}\n\n{result}")
     await callback.answer()
 
-# ======== بازی حدس عدد ========
+# ======== بازی حدس عدد (اصلاح‌شده) ========
 @dp.callback_query(lambda c: c.data == "guess_game")
 async def guess_game(callback: types.CallbackQuery):
     if not await is_member(callback.from_user.id):
         await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
         return
-    number = random.randint(1, 10)
-    await callback.message.answer(f"🔢 من یک عدد بین ۱ تا ۱۰ انتخاب کردم!\nحدس بزن! (عدد رو بفرست)")
-    # ذخیره عدد در دیتابیس یا متغیر سراسری (برای سادگی از دیتابیس استفاده نمی‌کنیم)
-    # در این نسخه ساده، عدد رو به کاربر می‌گوییم
-    await callback.message.answer(f"🤫 راستش عدد {number} بود!")
+    number = random.randint(1, 20)
+    guess_games[callback.from_user.id] = {"number": number, "attempts": 0}
+    await callback.message.answer(
+        f"🔢 من یک عدد بین ۱ تا ۲۰ انتخاب کردم!\n"
+        f"عدد مورد نظر را بفرستید.\n"
+        f"برای انصراف، /cancel را بفرستید."
+    )
     await callback.answer()
+
+@dp.message(Command("cancel"))
+async def cancel_guess(message: types.Message):
+    user_id = message.from_user.id
+    if user_id in guess_games:
+        del guess_games[user_id]
+        await message.answer("❌ بازی حدس عدد لغو شد.")
+    else:
+        await message.answer("⚠️ شما در حال حاضر هیچ بازی حدس عددی ندارید.")
+
+@dp.message(lambda msg: msg.text and msg.text.isdigit())
+async def handle_guess_number(message: types.Message):
+    user_id = message.from_user.id
+    if user_id not in guess_games:
+        return
+    if not await is_member(user_id):
+        await message.answer("❌ اول عضو کانال بشو!")
+        if user_id in guess_games:
+            del guess_games[user_id]
+        return
+    guess = int(message.text)
+    game = guess_games[user_id]
+    game["attempts"] += 1
+    target = game["number"]
+    if guess == target:
+        await message.answer(
+            f"🎉 **تبریک! درست حدس زدی!**\n"
+            f"عدد {target} بود.\n"
+            f"تعداد تلاش‌های شما: {game['attempts']}"
+        )
+        del guess_games[user_id]
+    elif guess < target:
+        await message.answer(f"📈 بیشتر از {guess} است. دوباره تلاش کن.")
+    else:
+        await message.answer(f"📉 کمتر از {guess} است. دوباره تلاش کن.")
 
 # ======== بازی شیر یا خط ========
 @dp.callback_query(lambda c: c.data == "coin_flip")
@@ -572,12 +616,14 @@ async def help_command(message: types.Message):
         "/start - شروع و منوی اصلی\n"
         "/help - نمایش راهنما\n"
         "/profile - پروفایل شما\n"
-        "/time - ساعت و تاریخ\n"
+        "/time - ساعت و تاریخ (تهران)\n"
+        "/id - نمایش آیدی عددی شما\n"
         "/joke - جوک تصادفی\n"
         "/quote - نقل قول انگیزشی\n"
         "/ping - بررسی وضعیت ربات\n"
         "/upload - آپلود فایل (فقط ادمین)\n"
         "/admin - پنل ادمین\n"
+        "/cancel - لغو بازی حدس عدد\n"
         "\n⚙️ دستورات مدیریت گروه:\n"
         "/lock - قفل گروه\n"
         "/unlock - باز کردن گروه\n"
@@ -590,10 +636,22 @@ async def help_command(message: types.Message):
 async def profile(message: types.Message):
     await message.answer(f"👤 نام: {message.from_user.full_name}\n🆔 آیدی: {message.from_user.id}")
 
+# ======== دستور /time (زمان تهران) ========
 @dp.message(Command("time"))
 async def time_command(message: types.Message):
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    await message.answer(f"🕒 {now}")
+    t = get_tehran_time()
+    days = ["دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه", "شنبه", "یک‌شنبه"]
+    await message.answer(
+        f"🕒 **زمان و تاریخ (تهران)**\n\n"
+        f"📅 تاریخ: {t.strftime('%Y/%m/%d')}\n"
+        f"📆 روز: {days[t.weekday()]}\n"
+        f"⏰ ساعت: {t.strftime('%H:%M:%S')}"
+    )
+
+# ======== دستور /id (اصلاح‌شده) ========
+@dp.message(Command("id"))
+async def id_command(message: types.Message):
+    await message.answer(f"🆔 آیدی عددی شما:\n<code>{message.from_user.id}</code>", parse_mode="HTML")
 
 @dp.message(Command("joke"))
 async def joke(message: types.Message):
