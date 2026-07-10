@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions, BotCommand
 from pymongo import MongoClient
 from aiohttp import web
 from pytube import YouTube
@@ -154,6 +154,24 @@ async def ask_ai(query: str) -> str:
 def get_tehran_time():
     return datetime.now(timezone.utc) + timedelta(hours=3, minutes=30)
 
+# ======== ثبت دستورات Slash Menu ========
+async def set_bot_commands():
+    commands = [
+        BotCommand(command="start", description="شروع ربات و نمایش منو"),
+        BotCommand(command="help", description="نمایش لیست دستورات"),
+        BotCommand(command="profile", description="مشاهده پروفایل"),
+        BotCommand(command="time", description="ساعت و تاریخ تهران"),
+        BotCommand(command="id", description="نمایش آیدی عددی شما"),
+        BotCommand(command="joke", description="دریافت جوک تصادفی"),
+        BotCommand(command="quote", description="نقل قول انگیزشی"),
+        BotCommand(command="ping", description="بررسی وضعیت ربات"),
+        BotCommand(command="admin", description="پنل ادمین (فقط ادمین)"),
+        BotCommand(command="cancel", description="لغو بازی حدس عدد"),
+        BotCommand(command="publishgroup", description="انتشار گروه فعلی"),
+    ]
+    await bot.set_my_commands(commands)
+    logging.info("✅ منوی دستورات (/commands) ثبت شد.")
+
 # ======== منوها ========
 def main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -229,7 +247,7 @@ async def send_group_files(message: types.Message, group_uuid: str):
                 await message.answer_document(file_id, caption=caption)
             await asyncio.sleep(0.5)
         except Exception as e:
-            logging.error(f"خطا در ارسال فایل {f['uuid']}: {e}")
+            logging.error(f"خطا در ارسال فایل {f.get('uuid')}: {e}")
     
     await message.answer("✅ **همه فایل‌های این گروه ارسال شدند!**")
 
@@ -240,7 +258,7 @@ async def start(message: types.Message):
     name = message.from_user.first_name
 
     if message.text and message.text.startswith("/start group_"):
-        group_uuid = message.text.split("_")[1]
+        group_uuid = message.text.split("_", 2)[1]
         if not await is_member(user_id):
             await message.answer(
                 f"👋 سلام {name}!\n"
@@ -252,7 +270,7 @@ async def start(message: types.Message):
         return
 
     if message.text and message.text.startswith("/start file_"):
-        file_uuid = message.text.split("_")[1]
+        file_uuid = message.text.split("_", 2)[1]
         file_data = files_col.find_one({"uuid": file_uuid})
         if file_data:
             if not await is_member(user_id):
@@ -321,11 +339,17 @@ async def get_youtube(message: types.Message):
         yt = YouTube(message.text)
         stream = yt.streams.get_highest_resolution()
         if stream:
-            await message.answer_video(stream.url, caption=f"🎬 {yt.title}")
+            await message.answer("⏬ در حال دانلود و ارسال ویدیو...")
+            file_path = f"temp_{uuid.uuid4()}.mp4"
+            stream.download(filename=file_path)
+            with open(file_path, "rb") as video:
+                await message.answer_video(video, caption=f"🎬 {yt.title}")
+            os.remove(file_path)
         else:
             await message.answer("❌ خطا!")
-    except:
-        await message.answer("❌ خطا! لینک معتبر نیست.")
+    except Exception as e:
+        logging.error(f"YouTube error: {e}")
+        await message.answer("❌ خطا! لینک معتبر نیست یا ویدیو در دسترس نیست.")
 
 # ======== دکمه‌های منوی اصلی ========
 @dp.callback_query(lambda c: c.data == "wallet")
@@ -514,13 +538,11 @@ async def upload_file_callback(callback: types.CallbackQuery):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
     
-    # بستن گروه قبلی اگر فعال باشه
     groups_col.update_many(
         {"admin_id": callback.from_user.id, "is_active": True},
         {"$set": {"is_active": False}}
     )
     
-    # ساخت گروه جدید
     group_uuid = str(uuid.uuid4())[:8]
     groups_col.insert_one({
         "group_uuid": group_uuid,
@@ -547,7 +569,6 @@ async def publish_group_callback(callback: types.CallbackQuery):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
     
-    # پیدا کردن گروه فعال برای این ادمین
     group = groups_col.find_one({"admin_id": callback.from_user.id, "is_active": True})
     
     if not group:
@@ -561,10 +582,8 @@ async def publish_group_callback(callback: types.CallbackQuery):
         await callback.answer("❌ این گروه هیچ فایلی ندارد. لطفاً ابتدا فایل ارسال کنید.", show_alert=True)
         return
 
-    # غیرفعال کردن گروه
     groups_col.update_one({"group_uuid": group_uuid}, {"$set": {"is_active": False}})
 
-    # ساخت لینک
     bot_info = await bot.get_me()
     link = f"https://t.me/{bot_info.username}?start=group_{group_uuid}"
 
@@ -578,19 +597,16 @@ async def publish_group_callback(callback: types.CallbackQuery):
     await callback.message.answer(text, parse_mode="HTML")
     await callback.answer()
 
-# ======== دریافت فایل‌ها و ذخیره در گروه جاری ========
+# ======== دریافت فایل‌ها ========
 @dp.message(lambda msg: msg.document or msg.photo or msg.video)
 async def handle_file_upload(message: types.Message):
     if not await is_admin(message.from_user.id):
         await message.answer("⛔ فقط ادمین می‌تواند فایل آپلود کند!")
         return
 
-    # پیدا کردن گروه فعال برای این ادمین
     group = groups_col.find_one({"admin_id": message.from_user.id, "is_active": True})
     if not group:
-        await message.answer(
-            "❌ شما هیچ گروه فعالی ندارید. ابتدا با دکمه 'شروع آپلود گروه جدید' یک گروه بسازید."
-        )
+        await message.answer("❌ شما هیچ گروه فعالی ندارید. ابتدا با دکمه 'شروع آپلود گروه جدید' یک گروه بسازید.")
         return
 
     group_uuid = group["group_uuid"]
@@ -598,7 +614,7 @@ async def handle_file_upload(message: types.Message):
     if message.document:
         file_id = message.document.file_id
         file_type = "document"
-        file_name = message.document.file_name
+        file_name = message.document.file_name or "document"
     elif message.photo:
         file_id = message.photo[-1].file_id
         file_type = "photo"
@@ -608,7 +624,6 @@ async def handle_file_upload(message: types.Message):
         file_type = "video"
         file_name = "ویدئو"
     else:
-        await message.answer("❌ نوع فایل پشتیبانی نمی‌شود.")
         return
 
     file_uuid = str(uuid.uuid4())[:8]
@@ -624,13 +639,14 @@ async def handle_file_upload(message: types.Message):
         "uploaded_at": datetime.now()
     })
 
-    # به‌روزرسانی تعداد فایل‌های گروه
     groups_col.update_one(
         {"group_uuid": group_uuid},
         {"$inc": {"file_count": 1}}
     )
 
-    new_count = groups_col.find_one({"group_uuid": group_uuid})["file_count"]
+    updated_group = groups_col.find_one({"group_uuid": group_uuid})
+    new_count = updated_group["file_count"] if updated_group else 0
+
     await message.answer(
         f"✅ فایل `{file_name}` با موفقیت به گروه اضافه شد.\n"
         f"تعداد فایل‌های گروه: {new_count}",
@@ -706,13 +722,7 @@ async def help_command(message: types.Message):
         "/ping - بررسی وضعیت ربات\n"
         "/admin - پنل ادمین\n"
         "/cancel - لغو بازی حدس عدد\n"
-        "/publishgroup - انتشار گروه فعلی (اختیاری، می‌توانید از دکمه استفاده کنید)\n"
-        "\n⚙️ دستورات مدیریت گروه:\n"
-        "/lock - قفل گروه\n"
-        "/unlock - باز کردن گروه\n"
-        "/ban [آیدی] - بن کاربر\n"
-        "/unban [آیدی] - رفع بن\n"
-        "/clear [تعداد] - پاک کردن پیام‌ها"
+        "/publishgroup - انتشار گروه فعلی"
     )
 
 @dp.message(Command("profile"))
@@ -759,7 +769,6 @@ async def publish_group_command(message: types.Message):
         await message.answer("⛔ فقط ادمین!")
         return
     
-    # پیدا کردن گروه فعال
     group = groups_col.find_one({"admin_id": message.from_user.id, "is_active": True})
     if not group:
         await message.answer("❌ شما هیچ گروه فعالی ندارید. ابتدا یک گروه جدید بسازید.")
@@ -891,7 +900,7 @@ async def handle_text(message: types.Message):
 
     await message.answer(random.choice(FUNNY_FALLBACKS))
 
-# ======== پورت ========
+# ======== وب سرور سلامت ========
 async def health_check(request):
     return web.Response(text="✅ Bot is running!")
 
@@ -908,6 +917,7 @@ async def start_web():
 async def main():
     await start_web()
     logging.info("🤖 Starting bot...")
+    await set_bot_commands()
     await dp.start_polling(bot, skip_updates=True)
 
 if __name__ == "__main__":
