@@ -4,7 +4,7 @@ import logging
 import random
 import aiohttp
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions
@@ -35,9 +35,6 @@ CHANNEL_LINK = "https://t.me/ajor_pareh"
 DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
 
 OPENROUTER_API_KEY = "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"
-
-# ======== ذخیره‌سازی موقت بازی حدس عدد ========
-guess_games = {}  # {user_id: {"number": int, "attempts": int}}
 
 # ======== جملات خنده‌دار ========
 FUNNY_FALLBACKS = [
@@ -158,14 +155,8 @@ async def ask_ai(query: str) -> str:
         return result
     return None
 
-def get_tehran_time():
-    """دریافت زمان تهران (UTC+3:30)"""
-    utc = datetime.now(timezone.utc)
-    tehran_offset = timedelta(hours=3, minutes=30)
-    tehran_time = utc + tehran_offset
-    return tehran_time
-
 def format_user_info(user, user_data=None):
+    """فرمت کردن اطلاعات کاربر برای نمایش"""
     name = user.full_name if user else user_data.get("name", "نامشخص")
     user_id = user.id if user else user_data.get("_id", "نامشخص")
     joined_at = user_data.get("joined_at", "نامشخص") if user_data else "نامشخص"
@@ -190,7 +181,7 @@ def game_menu():
         [InlineKeyboardButton(text="🎲 تاس", callback_data="dice"),
          InlineKeyboardButton(text="🎯 دارت", callback_data="dart")],
         [InlineKeyboardButton(text="🪨 سنگ‌کاغذ‌قیچی", callback_data="rps")],
-        [InlineKeyboardButton(text="🔢 حدس عدد", callback_data="guess_game")],
+        [InlineKeyboardButton(text="🎯 حدس عدد", callback_data="guess_game")],
         [InlineKeyboardButton(text="🪙 شیر یا خط", callback_data="coin_flip")],
         [InlineKeyboardButton(text="🔙 برگشت", callback_data="back_main")]
     ])
@@ -237,14 +228,13 @@ def channel_check_menu():
         [InlineKeyboardButton(text="✅ عضویت داشتم", callback_data="check_join")]
     ])
 
-# ============================================
 # ======== دستور /start ========
-# ============================================
 @dp.message(Command("start"))
 async def start(message: types.Message):
     user_id = message.from_user.id
     name = message.from_user.first_name
 
+    # بررسی مسدود بودن
     if await is_banned(user_id):
         await message.answer("🚫 شما توسط ادمین مسدود شده‌اید!")
         return
@@ -293,9 +283,7 @@ async def start(message: types.Message):
         reply_markup=main_menu()
     )
 
-# ============================================
 # ======== بررسی مجدد عضویت ========
-# ============================================
 @dp.callback_query(lambda c: c.data == "check_join")
 async def check_join(callback: types.CallbackQuery):
     user_id = callback.from_user.id
@@ -308,9 +296,7 @@ async def check_join(callback: types.CallbackQuery):
     else:
         await callback.answer("❌ هنوز عضو کانال نشدی! اول عضو شو.", show_alert=True)
 
-# ============================================
 # ======== دانلود یوتیوب ========
-# ============================================
 @dp.callback_query(lambda c: c.data == "youtube")
 async def youtube(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id):
@@ -340,9 +326,7 @@ async def get_youtube(message: types.Message):
     except:
         await message.answer("❌ خطا! لینک معتبر نیست.")
 
-# ============================================
 # ======== دکمه‌های منوی اصلی ========
-# ============================================
 @dp.callback_query(lambda c: c.data == "wallet")
 async def wallet_callback(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id):
@@ -376,9 +360,7 @@ async def profile_user_callback(callback: types.CallbackQuery):
     await callback.message.answer(f"👤 نام: {user.full_name}\n🆔 آیدی: {user.id}\n📱 شماره: ثبت نشده")
     await callback.answer()
 
-# ============================================
 # ======== بازی‌ها ========
-# ============================================
 @dp.callback_query(lambda c: c.data == "game")
 async def game(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id):
@@ -449,7 +431,6 @@ async def rps_play(callback: types.CallbackQuery):
     await callback.message.answer(f"تو: {user_emoji}\nربات: {bot_emoji}\n\n{result}")
     await callback.answer()
 
-# ======== بازی حدس عدد (اصلاح‌شده) ========
 @dp.callback_query(lambda c: c.data == "guess_game")
 async def guess_game(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id):
@@ -458,66 +439,10 @@ async def guess_game(callback: types.CallbackQuery):
     if not await is_member(callback.from_user.id):
         await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
         return
-    
-    user_id = callback.from_user.id
-    number = random.randint(1, 20)
-    guess_games[user_id] = {"number": number, "attempts": 0}
-    
-    await callback.message.answer(
-        f"🔢 من یک عدد بین ۱ تا ۲۰ انتخاب کردم!\n"
-        f"عدد مورد نظر را بفرستید تا حدس بزنید.\n"
-        f"برای انصراف، دستور /cancel رو بفرستید."
-    )
+    number = random.randint(1, 10)
+    await callback.message.answer(f"🔢 من عدد {number} رو انتخاب کردم!")
     await callback.answer()
 
-@dp.message(Command("cancel"))
-async def cancel_guess(message: types.Message):
-    user_id = message.from_user.id
-    if user_id in guess_games:
-        del guess_games[user_id]
-        await message.answer("❌ بازی حدس عدد لغو شد.")
-    else:
-        await message.answer("⚠️ شما در حال حاضر هیچ بازی حدس عددی ندارید.")
-
-# ======== پردازش حدس عدد ========
-@dp.message(lambda msg: msg.text and msg.text.isdigit())
-async def handle_guess_number(message: types.Message):
-    user_id = message.from_user.id
-    
-    # اگر کاربر در حالت حدس عدد نباشد، پیام را نادیده بگیر (برای جلوگیری از تداخل)
-    if user_id not in guess_games:
-        return
-    
-    # بررسی مسدود بودن و عضویت
-    if await is_banned(user_id):
-        await message.answer("🚫 شما مسدود هستید!")
-        if user_id in guess_games:
-            del guess_games[user_id]
-        return
-    if not await is_member(user_id):
-        await message.answer("❌ اول عضو کانال بشو!")
-        if user_id in guess_games:
-            del guess_games[user_id]
-        return
-    
-    guess = int(message.text)
-    game = guess_games[user_id]
-    game["attempts"] += 1
-    target = game["number"]
-    
-    if guess == target:
-        await message.answer(
-            f"🎉 **تبریک! درست حدس زدی!**\n"
-            f"عدد {target} بود.\n"
-            f"تعداد تلاش‌های شما: {game['attempts']}"
-        )
-        del guess_games[user_id]
-    elif guess < target:
-        await message.answer(f"📈 بیشتر از {guess} است. دوباره تلاش کن.")
-    else:
-        await message.answer(f"📉 کمتر از {guess} است. دوباره تلاش کن.")
-
-# ======== شیر یا خط ========
 @dp.callback_query(lambda c: c.data == "coin_flip")
 async def coin_flip(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id):
@@ -558,8 +483,9 @@ async def back_game(callback: types.CallbackQuery):
     await callback.answer()
 
 # ============================================
-# ======== پنل ادمین کامل (فقط برای ادمین) ========
+# ======== پنل ادمین کامل ========
 # ============================================
+
 @dp.callback_query(lambda c: c.data == "admin_panel")
 async def admin_panel(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -568,6 +494,7 @@ async def admin_panel(callback: types.CallbackQuery):
     await callback.message.answer("⚙️ پنل ادمین حرفه‌ای:", reply_markup=admin_menu())
     await callback.answer()
 
+# ======== آمار کامل ========
 @dp.callback_query(lambda c: c.data == "full_stats")
 async def full_stats(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -591,6 +518,7 @@ async def full_stats(callback: types.CallbackQuery):
     await callback.message.answer(stats_text, parse_mode="Markdown")
     await callback.answer()
 
+# ======== لیست کاربران با صفحه‌بندی ========
 @dp.callback_query(lambda c: c.data == "user_list")
 async def user_list(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -618,6 +546,7 @@ async def user_list(callback: types.CallbackQuery):
     await callback.message.answer(text, parse_mode="Markdown")
     await callback.answer()
 
+# ======== ارسال همگانی ========
 @dp.callback_query(lambda c: c.data == "broadcast")
 async def broadcast(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -642,6 +571,7 @@ async def handle_broadcast(message: types.Message):
             failed += 1
     await message.answer(f"✅ پیام به {sent} کاربر ارسال شد.\n❌ {failed} کاربر دریافت نکردند.")
 
+# ======== جستجوی کاربر ========
 @dp.callback_query(lambda c: c.data == "search_user")
 async def search_user(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -656,7 +586,10 @@ async def search_user_by_id(message: types.Message):
     user_data = users_col.find_one({"_id": user_id})
     if user_data:
         text = format_user_info(message.from_user, user_data)
-        await message.answer(text)
+        try:
+            await bot.send_message(message.chat.id, text)
+        except:
+            await message.answer("❌ کاربر این ربات را بلاک کرده یا وجود ندارد.")
     else:
         await message.answer("❌ کاربری با این آیدی یافت نشد.")
 
@@ -673,6 +606,7 @@ async def search_user_by_name(message: types.Message):
     else:
         await message.answer(f"❌ کاربری با نام '{name}' یافت نشد.")
 
+# ======== مدیریت مسدودها ========
 @dp.callback_query(lambda c: c.data == "ban_management")
 async def ban_management(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -837,10 +771,7 @@ async def handle_file_upload(message: types.Message):
         parse_mode="HTML"
     )
 
-# ============================================
-# ======== دستورات اصلاح‌شده ========
-# ============================================
-
+# ======== دستورات ========
 @dp.message(Command("help"))
 async def help_command(message: types.Message):
     await message.answer(
@@ -848,40 +779,22 @@ async def help_command(message: types.Message):
         "/start - شروع و منوی اصلی\n"
         "/help - نمایش راهنما\n"
         "/profile - پروفایل شما\n"
-        "/time - ساعت و تاریخ (به وقت تهران)\n"
-        "/id - نمایش آیدی عددی شما\n"
+        "/time - ساعت و تاریخ\n"
         "/joke - جوک تصادفی\n"
         "/quote - نقل قول انگیزشی\n"
         "/ping - بررسی وضعیت ربات\n"
         "/upload - آپلود فایل (فقط ادمین)\n"
-        "/admin - پنل ادمین\n"
-        "/cancel - لغو بازی حدس عدد"
+        "/admin - پنل ادمین"
     )
 
 @dp.message(Command("profile"))
 async def profile(message: types.Message):
     await message.answer(f"👤 نام: {message.from_user.full_name}\n🆔 آیدی: {message.from_user.id}")
 
-# ======== دستور /time با زمان تهران ========
 @dp.message(Command("time"))
 async def time_command(message: types.Message):
-    tehran_time = get_tehran_time()
-    persian_weekdays = {
-        0: "دوشنبه", 1: "سه‌شنبه", 2: "چهارشنبه",
-        3: "پنج‌شنبه", 4: "جمعه", 5: "شنبه", 6: "یک‌شنبه"
-    }
-    weekday = persian_weekdays[tehran_time.weekday()]
-    await message.answer(
-        f"🕒 **زمان و تاریخ (به وقت تهران)**\n\n"
-        f"📅 تاریخ: {tehran_time.strftime('%Y/%m/%d')}\n"
-        f"📆 روز: {weekday}\n"
-        f"⏰ ساعت: {tehran_time.strftime('%H:%M:%S')}"
-    )
-
-# ======== دستور /id (نمایش آیدی کاربر) ========
-@dp.message(Command("id"))
-async def id_command(message: types.Message):
-    await message.answer(f"🆔 آیدی عددی شما:\n<code>{message.from_user.id}</code>", parse_mode="HTML")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    await message.answer(f"🕒 {now}")
 
 @dp.message(Command("joke"))
 async def joke(message: types.Message):
@@ -902,9 +815,7 @@ async def admin_command(message: types.Message):
         return
     await message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
 
-# ============================================
 # ======== پاسخ به پیام‌های متنی ========
-# ============================================
 @dp.message()
 async def handle_text(message: types.Message):
     if message.chat.type != "private":
@@ -912,12 +823,10 @@ async def handle_text(message: types.Message):
 
     user_id = message.from_user.id
 
-    # بررسی مسدود بودن
     if await is_banned(user_id):
         await message.answer("🚫 شما توسط ادمین مسدود شده‌اید!")
         return
 
-    # بررسی عضویت در کانال
     if not await is_member(user_id):
         await message.answer(
             "❌ شما عضو کانال ما نیستی!\n"
@@ -928,24 +837,19 @@ async def handle_text(message: types.Message):
 
     text = message.text.strip().lower()
     
-    # پاسخ به احوال‌پرسی
     for key, response in GREETINGS.items():
         if key in text:
             await message.answer(response)
             return
 
-    # هوش مصنوعی
     ai_response = await ask_ai(text)
     if ai_response:
         await message.answer(ai_response)
         return
 
-    # جملات خنده‌دار
     await message.answer(random.choice(FUNNY_FALLBACKS))
 
-# ============================================
 # ======== پورت ========
-# ============================================
 async def health_check(request):
     return web.Response(text="✅ Bot is running!")
 
