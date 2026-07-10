@@ -161,7 +161,7 @@ def get_tehran_time():
 # ======== منوها ========
 def main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📂 لیست فایل‌ها", callback_data="list_files")],
+        [InlineKeyboardButton(text="📂 دریافت همه فایل‌ها", callback_data="list_files")],
         [InlineKeyboardButton(text="🎬 دانلود یوتیوب", callback_data="youtube")],
         [InlineKeyboardButton(text="🎮 بازی و سرگرمی", callback_data="game")],
         [InlineKeyboardButton(text="💳 کیف پول", callback_data="wallet"),
@@ -210,28 +210,32 @@ def channel_check_menu():
         [InlineKeyboardButton(text="✅ عضویت داشتم", callback_data="check_join")]
     ])
 
-# ======== نمایش لیست فایل‌های عمومی ========
-async def show_file_list(message: types.Message):
+# ======== ارسال خودکار همه فایل‌های عمومی ========
+async def send_all_files(message: types.Message):
     files = list(files_col.find({"is_public": True}).sort("uploaded_at", -1))
     if not files:
         await message.answer("📂 هیچ فایل عمومی‌ای وجود ندارد.")
         return
     
-    keyboard = []
+    await message.answer(f"📂 **{len(files)} فایل** یافت شد. در حال ارسال...")
+    
     for f in files:
-        btn_text = f.get("name", f"فایل {f['uuid']}")
-        keyboard.append([InlineKeyboardButton(
-            text=f"📎 {btn_text}",
-            callback_data=f"download_{f['uuid']}"
-        )])
+        file_id = f["file_id"]
+        file_type = f["type"]
+        caption = f.get("caption", DEFAULT_CAPTION)
+        
+        try:
+            if file_type == "photo":
+                await message.answer_photo(file_id, caption=caption)
+            elif file_type == "video":
+                await message.answer_video(file_id, caption=caption)
+            else:
+                await message.answer_document(file_id, caption=caption)
+            await asyncio.sleep(0.5)  # فاصله بین ارسال‌ها برای جلوگیری از محدودیت
+        except Exception as e:
+            logging.error(f"خطا در ارسال فایل {f['uuid']}: {e}")
     
-    keyboard.append([InlineKeyboardButton(text="🔙 برگشت", callback_data="back_main")])
-    
-    await message.answer(
-        "📂 **لیست فایل‌های عمومی**\n"
-        "روی هر فایل کلیک کن تا دریافت کنی:",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
-    )
+    await message.answer("✅ **همه فایل‌ها ارسال شدند!**")
 
 # ======== دستور /start ========
 @dp.message(Command("start"))
@@ -244,11 +248,11 @@ async def start(message: types.Message):
         if not await is_member(user_id):
             await message.answer(
                 f"👋 سلام {name}!\n"
-                "برای مشاهده فایل‌ها، لطفاً اول عضو کانال ما بشو:",
+                "برای دریافت فایل‌ها، لطفاً اول عضو کانال ما بشو:",
                 reply_markup=channel_check_menu()
             )
             return
-        await show_file_list(message)
+        await send_all_files(message)
         return
 
     # اگر کاربر از لینک اختصاصی فایل آمده باشد (حالت قدیمی)
@@ -308,41 +312,14 @@ async def check_join(callback: types.CallbackQuery):
     else:
         await callback.answer("❌ هنوز عضو کانال نشدی! اول عضو شو.", show_alert=True)
 
-# ======== دکمه لیست فایل‌ها ========
+# ======== دکمه دریافت همه فایل‌ها ========
 @dp.callback_query(lambda c: c.data == "list_files")
 async def list_files_callback(callback: types.CallbackQuery):
     if not await is_member(callback.from_user.id):
         await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
         return
-    await show_file_list(callback.message)
+    await send_all_files(callback.message)
     await callback.answer()
-
-# ======== دانلود فایل با کلیک روی دکمه ========
-@dp.callback_query(lambda c: c.data.startswith("download_"))
-async def download_file(callback: types.CallbackQuery):
-    user_id = callback.from_user.id
-    if not await is_member(user_id):
-        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
-        return
-    
-    file_uuid = callback.data.split("_")[1]
-    file_data = files_col.find_one({"uuid": file_uuid})
-    if not file_data:
-        await callback.answer("❌ فایل یافت نشد!", show_alert=True)
-        return
-    
-    file_id = file_data["file_id"]
-    file_type = file_data["type"]
-    caption = file_data.get("caption", DEFAULT_CAPTION)
-    
-    if file_type == "photo":
-        await callback.message.answer_photo(file_id, caption=caption)
-    elif file_type == "video":
-        await callback.message.answer_video(file_id, caption=caption)
-    else:
-        await callback.message.answer_document(file_id, caption=caption)
-    
-    await callback.answer("✅ فایل ارسال شد!")
 
 # ======== دانلود یوتیوب ========
 @dp.callback_query(lambda c: c.data == "youtube")
@@ -637,7 +614,7 @@ async def handle_file_upload(message: types.Message):
         "type": file_type,
         "name": file_name,
         "caption": caption,
-        "is_public": True,  # <-- این فایل در لیست عمومی نمایش داده می‌شود
+        "is_public": True,
         "uploaded_at": datetime.now()
     })
 
@@ -647,7 +624,7 @@ async def handle_file_upload(message: types.Message):
     await message.answer(
         f"✅ فایل با موفقیت آپلود شد!\n\n"
         f"🔗 لینک اختصاصی (قدیمی):\n<code>{link}</code>\n\n"
-        f"🔗 لینک عمومی (مشاهده همه فایل‌ها):\n"
+        f"🔗 لینک دریافت همه فایل‌ها:\n"
         f"<code>https://t.me/{bot_info.username}?start=files</code>\n\n"
         f"📌 کپشن فایل:\n{caption}\n\n"
         f"⚠️ کاربران ابتدا باید عضو کانال شوند تا فایل را دریافت کنند.",
