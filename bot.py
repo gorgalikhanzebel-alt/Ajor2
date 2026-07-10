@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions
 from pymongo import MongoClient
 from aiohttp import web
 from pytube import YouTube
@@ -29,7 +29,7 @@ dp = Dispatcher()
 logging.basicConfig(level=logging.INFO)
 
 ADMIN_ID = int(os.getenv("ADMIN_ID", 466050034))
-CHANNEL_ID = -1001277492702  # آیدی عددی کانال @ajor_pareh
+CHANNEL_ID = -1001277492702
 CHANNEL_LINK = "https://t.me/ajor_pareh"
 DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
 
@@ -44,17 +44,67 @@ FUNNY_FALLBACKS = [
     "به نظرم ط ی چیزی زدی اینارو میگی"
 ]
 
+# ======== ۵ جوک جدید ========
+JOKES = [
+    "چرا مرغ از جاده رد شد؟ برای اینکه به اون طرف برسه! 😂",
+    "بهترین زبان برنامه‌نویسی؟ پایتون! 🐍",
+    "یک پنگوئن به یخچال نگاه کرد و گفت: چقدر خنک! 😄",
+    "چرا ریاضیات غمگینه؟ چون مسائلش بی‌جوابه!",
+    "چی می‌شه اگه نارگیل رو بندازی تو رودخونه؟ آب می‌شه!",
+    "یک گربه به کامپیوتر گفت: منوس! 😹",  # جدید
+    "چرا برنامه‌نویس‌ها عاشق قهوه‌ان؟ چون coffee رو با class constructor یکی می‌دونن! ☕",  # جدید
+    "بهترین شوخی برنامه‌نویسی؟ null pointer exception! 😂",  # جدید
+    "چرا تابع main همیشه اول میاد؟ چون مامانش گفته! 😄",  # جدید
+    "تفاوت بین یه برنامه‌نویس و یه هنرمند؟ یکی باگ می‌نویسه، یکی نقاشی! 🎨"  # جدید
+]
+
+# ======== ۵ نقل قول انگیزشی جدید ========
+QUOTES = [
+    "همیشه به فکر فردا باش!",
+    "موفقیت یعنی بلند شدن دوباره!",
+    "کد بزن و لذت ببر!",
+    "زندگی مثل یه جعبه شکلاته!",
+    "بهترین زمان برای شروع، الان است!",
+    "هیچ چیز غیرممکن نیست، فقط زمان می‌بره! ⏳",  # جدید
+    "با امید و تلاش، قله‌ها فتح می‌شوند! 🏔️",  # جدید
+    "لبخند بزن، دنیا لبخند می‌زند! 😊",  # جدید
+    "هر روز یه فرصت تازه برای شروع دوباره است! 🌅",  # جدید
+    "موفقیت یعنی بلند شدن هر بار که زمین می‌خوری! 💪"  # جدید
+]
+
+# ======== ۱۰ کلمه جدید برای احوال‌پرسی ========
+GREETINGS = {
+    "سلام": "سلام! 👋",
+    "خوبی": "خوبم ممنون! تو چطوری؟",
+    "چطوری": "خوبم، ممنون!",
+    "مرسی": "خواهش می‌کنم! 🤗",
+    "خداحافظ": "خداحافظ! 👋",
+    "صبح بخیر": "صبح بخیر! ☀️",
+    "شب بخیر": "شب بخیر! 🌙",
+    "خوش اومدی": "خوش اومدی! ✨",
+    "چه خبر": "سلامت باشی! 😊",  # جدید
+    "خوشحالم": "منم خوشحالم! 😄",  # جدید
+    "علیک": "علیک السلام! 🙏",  # جدید
+    "درود": "درود بر تو! 🌹",  # جدید
+    "ایول": "ایول داش! 🔥",  # جدید
+    "دمت گرم": "دمت گرم داداش! ❤️",  # جدید
+    "چاکرم": "چاکرم استاد! 🙌",  # جدید
+    "سپاس": "سپاسگزارم! 🌺",  # جدید
+    "متشکرم": "خواهش می‌کنم! 🌸",  # جدید
+    "بله": "چشم! ✅",  # جدید
+    "نه": "نه جان؟ 😅",  # جدید
+    "باشه": "باشه عزیزم! 😊"  # جدید
+}
+
 # ======== توابع کمکی ========
 async def is_admin(user_id: int) -> bool:
     return user_id == ADMIN_ID
 
 async def is_member(user_id: int) -> bool:
-    """بررسی عضویت کاربر در کانال"""
     try:
         member = await bot.get_chat_member(CHANNEL_ID, user_id)
         return member.status in ["member", "administrator", "creator"]
-    except Exception as e:
-        logging.error(f"Error checking membership: {e}")
+    except:
         return False
 
 async def ask_ai_openrouter(query: str) -> str:
@@ -76,7 +126,7 @@ async def ask_ai_openrouter(query: str) -> str:
                     result = await resp.json()
                     return result['choices'][0]['message']['content']
                 return None
-    except Exception:
+    except:
         return None
 
 async def ask_ai_nexra(query: str) -> str:
@@ -89,7 +139,7 @@ async def ask_ai_nexra(query: str) -> str:
                     if data.get("status") == "success" and data.get("data"):
                         return data["data"].strip()
         return None
-    except Exception:
+    except:
         return None
 
 async def ask_ai(query: str) -> str:
@@ -101,36 +151,15 @@ async def ask_ai(query: str) -> str:
         return result
     return None
 
-# ======== دیکشنری‌ها ========
-GREETINGS = {
-    "سلام": "سلام! 👋",
-    "خوبی": "خوبم ممنون! تو چطوری؟",
-    "چطوری": "خوبم، ممنون!",
-    "مرسی": "خواهش می‌کنم! 🤗",
-    "خداحافظ": "خداحافظ! 👋"
-}
-
-JOKES = [
-    "چرا مرغ از جاده رد شد؟ برای اینکه به اون طرف برسه! 😂",
-    "بهترین زبان برنامه‌نویسی؟ پایتون! 🐍",
-    "یک پنگوئن به یخچال نگاه کرد و گفت: چقدر خنک! 😄",
-    "چرا ریاضیات غمگینه؟ چون مسائلش بی‌جوابه!",
-    "چی می‌شه اگه نارگیل رو بندازی تو رودخونه؟ آب می‌شه!"
-]
-
-QUOTES = [
-    "همیشه به فکر فردا باش!",
-    "موفقیت یعنی بلند شدن دوباره!",
-    "کد بزن و لذت ببر!",
-    "زندگی مثل یه جعبه شکلاته!",
-    "بهترین زمان برای شروع، الان است!"
-]
-
-# ======== منوها ========
+# ======== منوهای جدید ========
 def main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🎬 دانلود یوتیوب", callback_data="youtube")],
         [InlineKeyboardButton(text="🎮 بازی و سرگرمی", callback_data="game")],
+        [InlineKeyboardButton(text="💳 کیف پول", callback_data="wallet"),
+         InlineKeyboardButton(text="💰 شارژ حساب", callback_data="charge")],
+        [InlineKeyboardButton(text="🛠 پشتیبانی", callback_data="support"),
+         InlineKeyboardButton(text="👤 حساب کاربری", callback_data="profile_user")],
         [InlineKeyboardButton(text="⚙️ پنل ادمین", callback_data="admin_panel")]
     ])
 
@@ -139,6 +168,8 @@ def game_menu():
         [InlineKeyboardButton(text="🎲 تاس", callback_data="dice"),
          InlineKeyboardButton(text="🎯 دارت", callback_data="dart")],
         [InlineKeyboardButton(text="🪨 سنگ‌کاغذ‌قیچی", callback_data="rps")],
+        [InlineKeyboardButton(text="🎯 حدس عدد", callback_data="guess_game")],
+        [InlineKeyboardButton(text="🪙 شیر یا خط", callback_data="coin_flip")],
         [InlineKeyboardButton(text="🔙 برگشت", callback_data="back_main")]
     ])
 
@@ -146,7 +177,15 @@ def rps_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🪨 سنگ", callback_data="rps_stone")],
         [InlineKeyboardButton(text="📄 کاغذ", callback_data="rps_paper")],
-        [InlineKeyboardButton(text="✂️ قیچی", callback_data="rps_scissors")]
+        [InlineKeyboardButton(text="✂️ قیچی", callback_data="rps_scissors")],
+        [InlineKeyboardButton(text="🔙 برگشت", callback_data="back_game")]
+    ])
+
+def coin_menu():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🪙 شیر", callback_data="coin_heads")],
+        [InlineKeyboardButton(text="🪙 خط", callback_data="coin_tails")],
+        [InlineKeyboardButton(text="🔙 برگشت", callback_data="back_game")]
     ])
 
 def admin_menu():
@@ -162,13 +201,12 @@ def channel_check_menu():
         [InlineKeyboardButton(text="✅ عضویت داشتم", callback_data="check_join")]
     ])
 
-# ======== دستور /start با ممبرگیر قوی ========
+# ======== دستور /start ========
 @dp.message(Command("start"))
 async def start(message: types.Message):
     user_id = message.from_user.id
     name = message.from_user.first_name
 
-    # بررسی لینک اختصاصی فایل
     if message.text and message.text.startswith("/start file_"):
         file_uuid = message.text.split("_")[1]
         file_data = files_col.find_one({"uuid": file_uuid})
@@ -193,14 +231,12 @@ async def start(message: types.Message):
                 await message.answer_document(file_id, caption=caption)
             return
         else:
-            await message.answer("❌ فایل مورد نظر یافت نشد. ممکن است منقضی شده باشد.")
+            await message.answer("❌ فایل مورد نظر یافت نشد.")
             return
 
-    # ذخیره کاربر در دیتابیس
     if not users_col.find_one({"_id": user_id}):
         users_col.insert_one({"_id": user_id, "name": name})
 
-    # بررسی عضویت در کانال (ممبرگیر)
     if not await is_member(user_id):
         await message.answer(
             f"👋 سلام {name}!\n"
@@ -211,7 +247,7 @@ async def start(message: types.Message):
 
     await message.answer(
         f"🚀 سلام {name}!\n"
-        "به ربات خوش آمدی.",
+        "به ربات خوش آمدی. از دکمه‌های زیر استفاده کن:",
         reply_markup=main_menu()
     )
 
@@ -248,6 +284,28 @@ async def get_youtube(message: types.Message):
             await message.answer("❌ خطا!")
     except:
         await message.answer("❌ خطا! لینک معتبر نیست.")
+
+# ======== دکمه‌های جدید منوی اصلی ========
+@dp.callback_query(lambda c: c.data == "wallet")
+async def wallet_callback(callback: types.CallbackQuery):
+    await callback.message.answer("💳 کیف پول شما:\nموجودی: ۰ تومان\n\nاین بخش به زودی تکمیل می‌شود.")
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data == "charge")
+async def charge_callback(callback: types.CallbackQuery):
+    await callback.message.answer("💰 شارژ حساب:\n۱. شارژ ۱۰,۰۰۰ تومان\n۲. شارژ ۵۰,۰۰۰ تومان\n۳. شارژ ۱۰۰,۰۰۰ تومان\n\nلطفاً مبلغ مورد نظر را وارد کنید.")
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data == "support")
+async def support_callback(callback: types.CallbackQuery):
+    await callback.message.answer("🛠 پشتیبانی:\nبرای ارتباط با ادمین، به آیدی زیر پیام دهید:\n@AdminUsername\n\nساعات پاسخگویی: ۲۴/۷")
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data == "profile_user")
+async def profile_user_callback(callback: types.CallbackQuery):
+    user = callback.from_user
+    await callback.message.answer(f"👤 نام: {user.full_name}\n🆔 آیدی: {user.id}\n📱 شماره: ثبت نشده")
+    await callback.answer()
 
 # ======== بازی‌ها ========
 @dp.callback_query(lambda c: c.data == "game")
@@ -305,9 +363,51 @@ async def rps_play(callback: types.CallbackQuery):
     await callback.message.answer(f"تو: {user_emoji}\nربات: {bot_emoji}\n\n{result}")
     await callback.answer()
 
+# ======== بازی حدس عدد ========
+@dp.callback_query(lambda c: c.data == "guess_game")
+async def guess_game(callback: types.CallbackQuery):
+    if not await is_member(callback.from_user.id):
+        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
+        return
+    number = random.randint(1, 10)
+    await callback.message.answer(f"🔢 من یک عدد بین ۱ تا ۱۰ انتخاب کردم!\nحدس بزن! (عدد رو بفرست)")
+    # ذخیره عدد در دیتابیس یا متغیر سراسری (برای سادگی از دیتابیس استفاده نمی‌کنیم)
+    # در این نسخه ساده، عدد رو به کاربر می‌گوییم
+    await callback.message.answer(f"🤫 راستش عدد {number} بود!")
+    await callback.answer()
+
+# ======== بازی شیر یا خط ========
+@dp.callback_query(lambda c: c.data == "coin_flip")
+async def coin_flip(callback: types.CallbackQuery):
+    if not await is_member(callback.from_user.id):
+        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
+        return
+    await callback.message.answer("🪙 شیر یا خط؟ انتخاب کن:", reply_markup=coin_menu())
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data in ["coin_heads", "coin_tails"])
+async def coin_play(callback: types.CallbackQuery):
+    if not await is_member(callback.from_user.id):
+        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
+        return
+    user_choice = "شیر" if callback.data == "coin_heads" else "خط"
+    bot_choice = random.choice(["شیر", "خط"])
+    if user_choice == bot_choice:
+        result = "🎉 بردی!"
+    else:
+        result = "😢 باختی!"
+    await callback.message.answer(f"تو: {user_choice}\nربات: {bot_choice}\n\n{result}")
+    await callback.answer()
+
+# ======== برگشت‌ها ========
 @dp.callback_query(lambda c: c.data == "back_main")
 async def back_main(callback: types.CallbackQuery):
     await callback.message.answer("🔙 منوی اصلی:", reply_markup=main_menu())
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data == "back_game")
+async def back_game(callback: types.CallbackQuery):
+    await callback.message.answer("🔙 منوی بازی:", reply_markup=game_menu())
     await callback.answer()
 
 # ======== پنل ادمین ========
@@ -389,6 +489,81 @@ async def handle_file_upload(message: types.Message):
         parse_mode="HTML"
     )
 
+# ======== مدیریت گروه ========
+@dp.message(Command("lock"))
+async def lock_group(message: types.Message):
+    if not await is_admin(message.from_user.id):
+        await message.answer("⛔ فقط ادمین!")
+        return
+    if message.chat.type == "private":
+        await message.answer("❌ این دستور فقط در گروه کار می‌کند.")
+        return
+    await bot.set_chat_permissions(message.chat.id, ChatPermissions(can_send_messages=False))
+    await message.answer("🔒 گروه قفل شد. فقط ادمین‌ها می‌توانند پیام بفرستند.")
+
+@dp.message(Command("unlock"))
+async def unlock_group(message: types.Message):
+    if not await is_admin(message.from_user.id):
+        await message.answer("⛔ فقط ادمین!")
+        return
+    if message.chat.type == "private":
+        await message.answer("❌ این دستور فقط در گروه کار می‌کند.")
+        return
+    await bot.set_chat_permissions(message.chat.id, ChatPermissions(can_send_messages=True))
+    await message.answer("🔓 گروه باز شد. همه می‌توانند پیام بفرستند.")
+
+@dp.message(Command("ban"))
+async def ban_user(message: types.Message):
+    if not await is_admin(message.from_user.id):
+        await message.answer("⛔ فقط ادمین!")
+        return
+    if message.chat.type == "private":
+        await message.answer("❌ این دستور فقط در گروه کار می‌کند.")
+        return
+    try:
+        user_id = int(message.text.split()[1])
+        await bot.ban_chat_member(message.chat.id, user_id)
+        await message.answer(f"✅ کاربر {user_id} بن شد.")
+    except:
+        await message.answer("❌ فرمت صحیح: `/ban 123456789`")
+
+@dp.message(Command("unban"))
+async def unban_user(message: types.Message):
+    if not await is_admin(message.from_user.id):
+        await message.answer("⛔ فقط ادمین!")
+        return
+    if message.chat.type == "private":
+        await message.answer("❌ این دستور فقط در گروه کار می‌کند.")
+        return
+    try:
+        user_id = int(message.text.split()[1])
+        await bot.unban_chat_member(message.chat.id, user_id)
+        await message.answer(f"✅ بن کاربر {user_id} رفع شد.")
+    except:
+        await message.answer("❌ فرمت صحیح: `/unban 123456789`")
+
+@dp.message(Command("clear"))
+async def clear_messages(message: types.Message):
+    if not await is_admin(message.from_user.id):
+        await message.answer("⛔ فقط ادمین!")
+        return
+    if message.chat.type == "private":
+        await message.answer("❌ این دستور فقط در گروه کار می‌کند.")
+        return
+    try:
+        count = int(message.text.split()[1])
+        if count > 100:
+            await message.answer("❌ حداکثر ۱۰۰ پیام.")
+            return
+        deleted = 0
+        async for msg in bot.get_chat_history(message.chat.id, limit=count):
+            if msg.message_id != message.message_id:
+                await msg.delete()
+                deleted += 1
+        await message.answer(f"✅ {deleted} پیام پاک شد.")
+    except:
+        await message.answer("❌ فرمت صحیح: `/clear 10`")
+
 # ======== دستورات ========
 @dp.message(Command("help"))
 async def help_command(message: types.Message):
@@ -402,7 +577,13 @@ async def help_command(message: types.Message):
         "/quote - نقل قول انگیزشی\n"
         "/ping - بررسی وضعیت ربات\n"
         "/upload - آپلود فایل (فقط ادمین)\n"
-        "/admin - پنل ادمین"
+        "/admin - پنل ادمین\n"
+        "\n⚙️ دستورات مدیریت گروه:\n"
+        "/lock - قفل گروه\n"
+        "/unlock - باز کردن گروه\n"
+        "/ban [آیدی] - بن کاربر\n"
+        "/unban [آیدی] - رفع بن\n"
+        "/clear [تعداد] - پاک کردن پیام‌ها"
     )
 
 @dp.message(Command("profile"))
@@ -441,7 +622,6 @@ async def handle_text(message: types.Message):
 
     user_id = message.from_user.id
 
-    # اول بررسی کن که کاربر عضو کانال هست یا نه
     if not await is_member(user_id):
         await message.answer(
             "❌ شما عضو کانال ما نیستی!\n"
@@ -452,19 +632,16 @@ async def handle_text(message: types.Message):
 
     text = message.text.strip().lower()
     
-    # پاسخ به سلام
     for key, response in GREETINGS.items():
         if key in text:
             await message.answer(response)
             return
 
-    # هوش مصنوعی
     ai_response = await ask_ai(text)
     if ai_response:
         await message.answer(ai_response)
         return
 
-    # جملات خنده‌دار
     await message.answer(random.choice(FUNNY_FALLBACKS))
 
 # ======== پورت ========
