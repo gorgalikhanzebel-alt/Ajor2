@@ -33,6 +33,9 @@ CHANNEL_ID = int(os.getenv("CHANNEL_ID", -1001277492702))
 CHANNEL_LINK = "https://t.me/ajor_pareh"
 DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
 
+# ======== کلید هوش مصنوعی ========
+OPENROUTER_API_KEY = "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"
+
 # ======== توابع کمکی ========
 async def is_admin(user_id: int) -> bool:
     return user_id == ADMIN_ID
@@ -45,16 +48,28 @@ async def is_member(user_id: int) -> bool:
         return False
 
 async def ask_ai(query: str) -> str:
+    """پرسش از هوش مصنوعی با OpenRouter (رایگان و سبک)"""
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    data = {
+        "model": "google/gemini-2.0-flash-lite-001",
+        "messages": [{"role": "user", "content": query}],
+        "max_tokens": 500,
+        "temperature": 0.7,
+    }
+
     try:
         async with aiohttp.ClientSession() as session:
-            url = f"https://api.nexra.aryan.ir/v1/chat/gpt?text={query}"
-            async with session.get(url, timeout=10) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    if data.get("status") == "success" and data.get("data"):
-                        return data["data"].strip()
-        return None
-    except:
+            async with session.post(url, headers=headers, json=data, timeout=15) as resp:
+                if resp.status == 200:
+                    result = await resp.json()
+                    return result['choices'][0]['message']['content']
+                else:
+                    return None
+    except Exception:
         return None
 
 # ======== دیکشنری‌ها ========
@@ -118,13 +133,12 @@ def channel_check_menu():
         [InlineKeyboardButton(text="✅ عضویت داشتم", callback_data="check_join")]
     ])
 
-# ======== دستور /start با اصلاح ========
+# ======== دستور /start ========
 @dp.message(Command("start"))
 async def start(message: types.Message):
     user_id = message.from_user.id
     name = message.from_user.first_name
 
-    # بررسی لینک اختصاصی فایل
     if message.text and message.text.startswith("/start file_"):
         file_uuid = message.text.split("_")[1]
         file_data = files_col.find_one({"uuid": file_uuid})
@@ -152,7 +166,6 @@ async def start(message: types.Message):
             await message.answer("❌ فایل مورد نظر یافت نشد. ممکن است منقضی شده باشد.")
             return
 
-    # ادامه کد عادی /start
     if not users_col.find_one({"_id": user_id}):
         users_col.insert_one({"_id": user_id, "name": name})
 
@@ -367,7 +380,7 @@ async def admin_command(message: types.Message):
         return
     await message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
 
-# ======== پاسخ به پیام‌های متنی ========
+# ======== پاسخ به پیام‌های متنی (با هوش مصنوعی) ========
 @dp.message()
 async def handle_text(message: types.Message):
     if message.chat.type != "private":
@@ -375,16 +388,19 @@ async def handle_text(message: types.Message):
 
     text = message.text.strip().lower()
     
+    # پاسخ به سلام
     for key, response in GREETINGS.items():
         if key in text:
             await message.answer(response)
             return
 
+    # هوش مصنوعی
     ai_response = await ask_ai(text)
     if ai_response:
         await message.answer(ai_response)
         return
 
+    # اگر هوش مصنوعی جواب نداد، جوک یا نقل قول
     fallback = random.choice([
         random.choice(JOKES),
         "💬 " + random.choice(QUOTES)
