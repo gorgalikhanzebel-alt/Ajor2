@@ -228,7 +228,7 @@ async def stats(callback: types.CallbackQuery):
     await callback.message.answer(f"📊 تعداد کاربران ثبت‌شده: {count}")
     await callback.answer()
 
-# ======== دستورات جدید ========
+# ======== دستورات کامل ========
 @dp.message(Command("help"))
 async def help_command(message: types.Message):
     await message.answer(
@@ -239,6 +239,7 @@ async def help_command(message: types.Message):
         "/time - ساعت و تاریخ\n"
         "/joke - جوک تصادفی\n"
         "/quote - نقل قول انگیزشی\n"
+        "/ping - بررسی وضعیت ربات\n"
         "/admin - پنل ادمین"
     )
 
@@ -259,6 +260,10 @@ async def joke(message: types.Message):
 async def quote(message: types.Message):
     await message.answer(f"💬 {random.choice(QUOTES)}")
 
+@dp.message(Command("ping"))
+async def ping(message: types.Message):
+    await message.answer("✅ ربات آنلاین و سالم است!")
+
 @dp.message(Command("admin"))
 async def admin_command(message: types.Message):
     if not await is_admin(message.from_user.id):
@@ -266,7 +271,7 @@ async def admin_command(message: types.Message):
         return
     await message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
 
-# ======== پاسخ به پیام‌های متنی (غیر از دستورات) ========
+# ======== پاسخ به پیام‌های متنی ========
 @dp.message()
 async def handle_text(message: types.Message):
     if message.chat.type != "private":
@@ -274,19 +279,16 @@ async def handle_text(message: types.Message):
 
     text = message.text.strip().lower()
     
-    # پاسخ به سلام
     for key, response in GREETINGS.items():
         if key in text:
             await message.answer(response)
             return
 
-    # هوش مصنوعی
     ai_response = await ask_ai(text)
     if ai_response:
         await message.answer(ai_response)
         return
 
-    # جوک یا نقل قول (پیش‌فرض)
     fallback = random.choice([
         random.choice(JOKES),
         "💬 " + random.choice(QUOTES)
