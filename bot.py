@@ -31,7 +31,6 @@ logging.basicConfig(level=logging.INFO)
 ADMIN_ID = int(os.getenv("ADMIN_ID", 466050034))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", -1001277492702))
 
-# ======== کپشن پیش‌فرض برای فایل‌ها ========
 DEFAULT_CAPTION = "📌 عضویت در کانال ما: @Ajor_pareh"
 
 # ======== توابع کمکی ========
@@ -125,7 +124,6 @@ async def start(message: types.Message):
     user_id = message.from_user.id
     name = message.from_user.first_name
 
-    # بررسی لینک اختصاصی فایل
     if message.text and message.text.startswith("/start file_"):
         file_uuid = message.text.split("_")[1]
         file_data = files_col.find_one({"uuid": file_uuid})
@@ -149,15 +147,12 @@ async def start(message: types.Message):
             else:
                 await message.answer_document(file_id, caption=caption)
             
-            # حذف فایل از دیتابیس (یکبار مصرف)
-            # files_col.delete_one({"uuid": file_uuid})
+            # files_col.delete_one({"uuid": file_uuid})  # یکبار مصرف
             return
 
-    # ذخیره کاربر
     if not users_col.find_one({"_id": user_id}):
         users_col.insert_one({"_id": user_id, "name": name})
 
-    # بررسی عضویت در کانال
     if not await is_member(user_id):
         await message.answer(
             f"👋 سلام {name}!\n"
@@ -264,22 +259,30 @@ async def stats(callback: types.CallbackQuery):
     await callback.message.answer(f"📊 تعداد کاربران ثبت‌شده: {count}")
     await callback.answer()
 
-# ======== آپلود فایل (فقط ادمین) ========
+# ======== آپلود فایل (دکمه) ========
 @dp.callback_query(lambda c: c.data == "upload_file")
-async def upload_file(callback: types.CallbackQuery):
+async def upload_file_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
     await callback.message.answer("📤 لطفاً فایل (عکس، ویدئو، سند) را ارسال کنید.\nبرای کپشن دلخواه، هنگام ارسال فایل، در قسمت کپشن بنویسید.")
     await callback.answer()
 
+# ======== دستور مستقیم /upload ========
+@dp.message(Command("upload"))
+async def upload_file_command(message: types.Message):
+    if not await is_admin(message.from_user.id):
+        await message.answer("⛔ فقط ادمین می‌تواند فایل آپلود کند!")
+        return
+    await message.answer("📤 لطفاً فایل (عکس، ویدئو، سند) را ارسال کنید.\nبرای کپشن دلخواه، هنگام ارسال فایل، در قسمت کپشن بنویسید.")
+
+# ======== دریافت فایل ========
 @dp.message(lambda msg: msg.document or msg.photo or msg.video)
 async def handle_file_upload(message: types.Message):
     if not await is_admin(message.from_user.id):
         await message.answer("⛔ فقط ادمین می‌تواند فایل آپلود کند!")
         return
 
-    # دریافت اطلاعات فایل
     if message.document:
         file_id = message.document.file_id
         file_type = "document"
@@ -296,13 +299,9 @@ async def handle_file_upload(message: types.Message):
         await message.answer("❌ نوع فایل پشتیبانی نمی‌شود.")
         return
 
-    # تولید UUID یکتا
     file_uuid = str(uuid.uuid4())[:8]
-
-    # کپشن: اگر کاربر کپشن داده بود، ازش استفاده کن، در غیر این صورت کپشن پیش‌فرض
     caption = message.caption if message.caption else DEFAULT_CAPTION
 
-    # ذخیره در دیتابیس
     files_col.insert_one({
         "uuid": file_uuid,
         "file_id": file_id,
@@ -312,7 +311,6 @@ async def handle_file_upload(message: types.Message):
         "uploaded_at": datetime.now()
     })
 
-    # ساخت لینک اختصاصی
     bot_info = await bot.get_me()
     link = f"https://t.me/{bot_info.username}?start=file_{file_uuid}"
 
@@ -336,6 +334,7 @@ async def help_command(message: types.Message):
         "/joke - جوک تصادفی\n"
         "/quote - نقل قول انگیزشی\n"
         "/ping - بررسی وضعیت ربات\n"
+        "/upload - آپلود فایل (فقط ادمین)\n"
         "/admin - پنل ادمین"
     )
 
