@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
 from pymongo import MongoClient
 from aiohttp import web
 from pytube import YouTube
@@ -29,7 +29,7 @@ dp = Dispatcher()
 logging.basicConfig(level=logging.INFO)
 
 ADMIN_ID = int(os.getenv("ADMIN_ID", 466050034))
-CHANNEL_ID = -1001277492702  # آیدی عددی کانال @ajor_pareh
+CHANNEL_ID = -1001277492702
 CHANNEL_LINK = "https://t.me/ajor_pareh"
 DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
 
@@ -49,12 +49,10 @@ async def is_admin(user_id: int) -> bool:
     return user_id == ADMIN_ID
 
 async def is_member(user_id: int) -> bool:
-    """بررسی عضویت کاربر در کانال"""
     try:
         member = await bot.get_chat_member(CHANNEL_ID, user_id)
         return member.status in ["member", "administrator", "creator"]
-    except Exception as e:
-        logging.error(f"Error checking membership: {e}")
+    except:
         return False
 
 async def ask_ai_openrouter(query: str) -> str:
@@ -76,7 +74,7 @@ async def ask_ai_openrouter(query: str) -> str:
                     result = await resp.json()
                     return result['choices'][0]['message']['content']
                 return None
-    except Exception:
+    except:
         return None
 
 async def ask_ai_nexra(query: str) -> str:
@@ -89,7 +87,7 @@ async def ask_ai_nexra(query: str) -> str:
                     if data.get("status") == "success" and data.get("data"):
                         return data["data"].strip()
         return None
-    except Exception:
+    except:
         return None
 
 async def ask_ai(query: str) -> str:
@@ -162,13 +160,29 @@ def channel_check_menu():
         [InlineKeyboardButton(text="✅ عضویت داشتم", callback_data="check_join")]
     ])
 
-# ======== دستور /start با ممبرگیر قوی ========
+# ======== تنظیم دستورات (منوی پایین ربات) ========
+async def set_commands():
+    commands = [
+        BotCommand(command="start", description="شروع و منوی اصلی"),
+        BotCommand(command="help", description="راهنما"),
+        BotCommand(command="about", description="درباره ربات"),
+        BotCommand(command="ping", description="بررسی وضعیت"),
+        BotCommand(command="time", description="ساعت و تاریخ"),
+        BotCommand(command="id", description="آیدی من"),
+        BotCommand(command="profile", description="پروفایل من"),
+        BotCommand(command="stats", description="آمار ربات"),
+        BotCommand(command="joke", description="جوک تصادفی"),
+        BotCommand(command="quote", description="نقل قول انگیزشی"),
+        BotCommand(command="admin", description="پنل ادمین"),
+    ]
+    await bot.set_my_commands(commands)
+
+# ======== دستور /start ========
 @dp.message(Command("start"))
 async def start(message: types.Message):
     user_id = message.from_user.id
     name = message.from_user.first_name
 
-    # بررسی لینک اختصاصی فایل
     if message.text and message.text.startswith("/start file_"):
         file_uuid = message.text.split("_")[1]
         file_data = files_col.find_one({"uuid": file_uuid})
@@ -180,11 +194,9 @@ async def start(message: types.Message):
                     reply_markup=channel_check_menu()
                 )
                 return
-            
             file_id = file_data["file_id"]
             file_type = file_data["type"]
             caption = file_data.get("caption", DEFAULT_CAPTION)
-            
             if file_type == "photo":
                 await message.answer_photo(file_id, caption=caption)
             elif file_type == "video":
@@ -193,14 +205,12 @@ async def start(message: types.Message):
                 await message.answer_document(file_id, caption=caption)
             return
         else:
-            await message.answer("❌ فایل مورد نظر یافت نشد. ممکن است منقضی شده باشد.")
+            await message.answer("❌ فایل مورد نظر یافت نشد.")
             return
 
-    # ذخیره کاربر در دیتابیس
     if not users_col.find_one({"_id": user_id}):
         users_col.insert_one({"_id": user_id, "name": name})
 
-    # بررسی عضویت در کانال (ممبرگیر)
     if not await is_member(user_id):
         await message.answer(
             f"👋 سلام {name}!\n"
@@ -349,7 +359,6 @@ async def handle_file_upload(message: types.Message):
     if not await is_admin(message.from_user.id):
         await message.answer("⛔ فقط ادمین می‌تواند فایل آپلود کند!")
         return
-
     if message.document:
         file_id = message.document.file_id
         file_type = "document"
@@ -365,10 +374,8 @@ async def handle_file_upload(message: types.Message):
     else:
         await message.answer("❌ نوع فایل پشتیبانی نمی‌شود.")
         return
-
     file_uuid = str(uuid.uuid4())[:8]
     caption = message.caption if message.caption else DEFAULT_CAPTION
-
     files_col.insert_one({
         "uuid": file_uuid,
         "file_id": file_id,
@@ -377,10 +384,8 @@ async def handle_file_upload(message: types.Message):
         "caption": caption,
         "uploaded_at": datetime.now()
     })
-
     bot_info = await bot.get_me()
     link = f"https://t.me/{bot_info.username}?start=file_{file_uuid}"
-
     await message.answer(
         f"✅ فایل با موفقیت آپلود شد!\n\n"
         f"🔗 لینک اختصاصی:\n<code>{link}</code>\n\n"
@@ -396,23 +401,42 @@ async def help_command(message: types.Message):
         "📖 لیست دستورات:\n"
         "/start - شروع و منوی اصلی\n"
         "/help - نمایش راهنما\n"
-        "/profile - پروفایل شما\n"
+        "/about - درباره ربات\n"
+        "/ping - بررسی وضعیت\n"
         "/time - ساعت و تاریخ\n"
+        "/id - آیدی من\n"
+        "/profile - پروفایل من\n"
+        "/stats - آمار ربات\n"
         "/joke - جوک تصادفی\n"
         "/quote - نقل قول انگیزشی\n"
-        "/ping - بررسی وضعیت ربات\n"
-        "/upload - آپلود فایل (فقط ادمین)\n"
         "/admin - پنل ادمین"
     )
 
-@dp.message(Command("profile"))
-async def profile(message: types.Message):
-    await message.answer(f"👤 نام: {message.from_user.full_name}\n🆔 آیدی: {message.from_user.id}")
+@dp.message(Command("about"))
+async def about(message: types.Message):
+    await message.answer("🤖 این ربات با قابلیت‌های دانلود یوتیوب، بازی‌ها، هوش مصنوعی، آپلود فایل و مدیریت گروه ساخته شده است.")
+
+@dp.message(Command("ping"))
+async def ping(message: types.Message):
+    await message.answer("✅ ربات آنلاین و سالم است!")
 
 @dp.message(Command("time"))
 async def time_command(message: types.Message):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     await message.answer(f"🕒 {now}")
+
+@dp.message(Command("id"))
+async def id_command(message: types.Message):
+    await message.answer(f"🆔 آیدی شما: `{message.from_user.id}`")
+
+@dp.message(Command("profile"))
+async def profile(message: types.Message):
+    await message.answer(f"👤 نام: {message.from_user.full_name}\n🆔 آیدی: {message.from_user.id}")
+
+@dp.message(Command("stats"))
+async def stats_command(message: types.Message):
+    count = users_col.count_documents({})
+    await message.answer(f"📊 تعداد کاربران ثبت‌شده: {count}")
 
 @dp.message(Command("joke"))
 async def joke(message: types.Message):
@@ -421,10 +445,6 @@ async def joke(message: types.Message):
 @dp.message(Command("quote"))
 async def quote(message: types.Message):
     await message.answer(f"💬 {random.choice(QUOTES)}")
-
-@dp.message(Command("ping"))
-async def ping(message: types.Message):
-    await message.answer("✅ ربات آنلاین و سالم است!")
 
 @dp.message(Command("admin"))
 async def admin_command(message: types.Message):
@@ -438,10 +458,7 @@ async def admin_command(message: types.Message):
 async def handle_text(message: types.Message):
     if message.chat.type != "private":
         return
-
     user_id = message.from_user.id
-
-    # اول بررسی کن که کاربر عضو کانال هست یا نه
     if not await is_member(user_id):
         await message.answer(
             "❌ شما عضو کانال ما نیستی!\n"
@@ -449,22 +466,15 @@ async def handle_text(message: types.Message):
             reply_markup=channel_check_menu()
         )
         return
-
     text = message.text.strip().lower()
-    
-    # پاسخ به سلام
     for key, response in GREETINGS.items():
         if key in text:
             await message.answer(response)
             return
-
-    # هوش مصنوعی
     ai_response = await ask_ai(text)
     if ai_response:
         await message.answer(ai_response)
         return
-
-    # جملات خنده‌دار
     await message.answer(random.choice(FUNNY_FALLBACKS))
 
 # ======== پورت ========
@@ -483,6 +493,7 @@ async def start_web():
 
 async def main():
     await start_web()
+    await set_commands()  # تنظیم دستورات در تلگرام
     logging.info("🤖 Starting bot...")
     await dp.start_polling(bot, skip_updates=True)
 
