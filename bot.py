@@ -10,6 +10,7 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions
 from pymongo import MongoClient
 from aiohttp import web
+from pytube import YouTube
 
 TOKEN = os.getenv("BOT_TOKEN")
 MONGO_URI = os.getenv("MONGO_URI")
@@ -43,7 +44,7 @@ GREETINGS = {
     "شب بخیر": ["شب بخیر! 🌙", "خواب خوب!"]
 }
 
-# ======== لیست جوک‌ها ========
+# ======== لیست جوک‌ها و نقل قول‌ها ========
 JOKES = [
     "چرا مرغ از جاده رد شد؟ برای اینکه به اون طرف برسه! 😂",
     "بهترین زبان برنامه‌نویسی؟ پایتون! 🐍",
@@ -200,7 +201,7 @@ async def get_insta(message: types.Message):
         return
     await message.answer("❌ متأسفانه دانلود اینستاگرام با مشکلات فنی مواجه شده. لطفاً از گزینه‌های یوتیوب یا تیک‌تاک استفاده کن.")
 
-# ======== دانلود یوتیوب ========
+# ======== دانلود یوتیوب با pytube ========
 @dp.callback_query(lambda c: c.data == "youtube")
 async def youtube(callback: types.CallbackQuery):
     if not await is_member(callback.from_user.id):
@@ -216,17 +217,16 @@ async def get_youtube(message: types.Message):
         return
     await message.answer("⏳ در حال دریافت ویدیو از یوتیوب...")
     try:
-        import yt_dlp
-        ydl_opts = {'format': 'best', 'quiet': True}
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(message.text, download=False)
-            video_url = info.get('url')
-            if video_url:
-                await message.answer_video(video_url, caption="🎬 ویدیو دانلود شد!")
-            else:
-                await message.answer("❌ خطا!")
-    except:
-        await message.answer("❌ خطا! لینک معتبر نیست.")
+        yt = YouTube(message.text)
+        stream = yt.streams.get_highest_resolution()
+        if stream:
+            video_url = stream.url
+            await message.answer_video(video_url, caption=f"🎬 {yt.title}")
+        else:
+            await message.answer("❌ خطا! ویدیو پیدا نشد.")
+    except Exception as e:
+        logging.error(e)
+        await message.answer("❌ خطا! لینک معتبر نیست یا ویدیو قابل دانلود نیست.")
 
 # ======== دانلود تیک‌تاک ========
 @dp.callback_query(lambda c: c.data == "tiktok")
@@ -545,29 +545,25 @@ async def clear_cmd(message: types.Message):
 @dp.message()
 async def handle_text(message: types.Message):
     if message.chat.type != "private":
-        return  # فقط در پیوی پاسخ می‌دهیم
+        return
 
     user_id = message.from_user.id
     text = message.text.strip()
 
-    # ۱. بررسی عضویت در کانال
     if not await is_member(user_id):
         await message.answer("❌ لطفاً اول عضو کانال ما بشو.", reply_markup=channel_check_menu())
         return
 
-    # ۲. پاسخ به سلام و احوالپرسی
     greeting_response = get_greeting_response(text)
     if greeting_response:
         await message.answer(greeting_response)
         return
 
-    # ۳. هوش مصنوعی (اگر کاربر سوال پرسید)
     ai_response = await ask_ai(text)
     if ai_response:
         await message.answer(ai_response)
         return
 
-    # ۴. پاسخ پیش‌فرض با جوک یا نقل قول
     fallback = random.choice([
         random.choice(JOKES),
         "💬 " + random.choice(QUOTES),
