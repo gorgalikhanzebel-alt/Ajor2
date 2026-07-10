@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions, BotCommand
 from pymongo import MongoClient
 from aiohttp import web
 from pytube import YouTube
@@ -195,7 +195,7 @@ def admin_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📊 آمار کاربران", callback_data="stats")],
         [InlineKeyboardButton(text="📤 شروع آپلود گروه جدید", callback_data="upload_file")],
-        [InlineKeyboardButton(text="📤 انتشار گروه و دریافت لینک", callback_data="publish_group")],  # <-- دکمه جدید
+        [InlineKeyboardButton(text="📤 انتشار گروه و دریافت لینک", callback_data="publish_group")],
         [InlineKeyboardButton(text="📋 مدیریت گروه‌ها", callback_data="manage_groups")],
         [InlineKeyboardButton(text="🔙 برگشت", callback_data="back_main")]
     ])
@@ -511,7 +511,6 @@ async def stats(callback: types.CallbackQuery):
     await callback.answer()
 
 # ======== شروع آپلود گروه جدید ========
-# دیکشنری برای نگهداری گروه جاری هر ادمین (در حافظه)
 current_groups = {}
 
 @dp.callback_query(lambda c: c.data == "upload_file")
@@ -520,7 +519,6 @@ async def upload_file_callback(callback: types.CallbackQuery):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
     
-    # ساخت گروه جدید
     group_uuid = str(uuid.uuid4())[:8]
     groups_col.insert_one({
         "group_uuid": group_uuid,
@@ -530,7 +528,6 @@ async def upload_file_callback(callback: types.CallbackQuery):
         "file_count": 0
     })
     
-    # ذخیره در دیکشنری
     current_groups[callback.from_user.id] = group_uuid
     
     await callback.message.answer(
@@ -543,7 +540,7 @@ async def upload_file_callback(callback: types.CallbackQuery):
     )
     await callback.answer()
 
-# ======== انتشار گروه (دکمه و دستور) ========
+# ======== انتشار گروه ========
 async def publish_group_action(message_or_callback, user_id, is_callback=False):
     group_uuid = current_groups.get(user_id)
     if not group_uuid:
@@ -574,10 +571,8 @@ async def publish_group_action(message_or_callback, user_id, is_callback=False):
             await message_or_callback.answer(text)
         return
 
-    # غیرفعال کردن گروه
     groups_col.update_one({"group_uuid": group_uuid}, {"$set": {"is_active": False}})
 
-    # ساخت لینک
     bot_info = await bot.get_me()
     link = f"https://t.me/{bot_info.username}?start=group_{group_uuid}"
 
@@ -594,11 +589,9 @@ async def publish_group_action(message_or_callback, user_id, is_callback=False):
     else:
         await message_or_callback.answer(text, parse_mode="HTML")
 
-    # حذف از دیکشنری
     if user_id in current_groups:
         del current_groups[user_id]
 
-# Callback برای دکمه انتشار
 @dp.callback_query(lambda c: c.data == "publish_group")
 async def publish_group_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -606,7 +599,6 @@ async def publish_group_callback(callback: types.CallbackQuery):
         return
     await publish_group_action(callback, callback.from_user.id, is_callback=True)
 
-# دستور /publishgroup (اختیاری، برای کسانی که دوست دارند تایپ کنند)
 @dp.message(Command("publishgroup"))
 async def publish_group_command(message: types.Message):
     if not await is_admin(message.from_user.id):
@@ -635,7 +627,6 @@ async def handle_file_upload(message: types.Message):
             del current_groups[message.from_user.id]
         return
 
-    # تعیین نوع فایل
     if message.document:
         file_id = message.document.file_id
         file_type = "document"
@@ -665,7 +656,6 @@ async def handle_file_upload(message: types.Message):
         "uploaded_at": datetime.now()
     })
 
-    # به‌روزرسانی تعداد فایل‌های گروه
     groups_col.update_one(
         {"group_uuid": group_uuid},
         {"$inc": {"file_count": 1}}
@@ -794,7 +784,7 @@ async def admin_command(message: types.Message):
         return
     await message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
 
-# ======== مدیریت گروه‌های تلگرامی (قفل، بن، پاک کردن) ========
+# ======== مدیریت گروه‌های تلگرامی ========
 @dp.message(Command("lock"))
 async def lock_group(message: types.Message):
     if not await is_admin(message.from_user.id):
@@ -914,6 +904,23 @@ async def start_web():
     logging.info(f"✅ Web server started on port {port}")
 
 async def main():
+    # ======== ثبت دستورات در منوی ربات ========
+    commands = [
+        BotCommand(command="start", description="🚀 شروع و منوی اصلی"),
+        BotCommand(command="help", description="📖 راهنما"),
+        BotCommand(command="profile", description="👤 پروفایل شما"),
+        BotCommand(command="time", description="🕒 زمان و تاریخ تهران"),
+        BotCommand(command="id", description="🆔 نمایش آیدی عددی شما"),
+        BotCommand(command="joke", description="😂 جوک تصادفی"),
+        BotCommand(command="quote", description="💬 نقل قول انگیزشی"),
+        BotCommand(command="ping", description="✅ بررسی وضعیت ربات"),
+        BotCommand(command="admin", description="⚙️ پنل ادمین"),
+        BotCommand(command="cancel", description="❌ لغو بازی حدس عدد"),
+        BotCommand(command="publishgroup", description="📤 انتشار گروه و دریافت لینک (ادمین)"),
+    ]
+    await bot.set_my_commands(commands)
+    logging.info("✅ دستورات با موفقیت در منوی ربات ثبت شدند.")
+
     await start_web()
     logging.info("🤖 Starting bot...")
     await dp.start_polling(bot, skip_updates=True)
