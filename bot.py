@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions, BotCommand
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions
 from pymongo import MongoClient
 from aiohttp import web
 from pytube import YouTube
@@ -157,7 +157,7 @@ def get_tehran_time():
 # ======== منوها ========
 def main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📋 لیست دستورات", callback_data="show_commands")],  # <-- دکمه جدید
+        [InlineKeyboardButton(text="📋 لیست دستورات", callback_data="show_commands")],
         [InlineKeyboardButton(text="🎬 دانلود یوتیوب", callback_data="youtube")],
         [InlineKeyboardButton(text="🎮 بازی و سرگرمی", callback_data="game")],
         [InlineKeyboardButton(text="💳 کیف پول", callback_data="wallet"),
@@ -954,23 +954,9 @@ async def start_web():
     logging.info(f"✅ Web server started on port {port}")
 
 async def main():
-    # ======== ثبت دستورات در منوی ربات ========
-    commands = [
-        BotCommand(command="start", description="🚀 شروع و منوی اصلی"),
-        BotCommand(command="menu", description="📋 لیست تمام دستورات"),
-        BotCommand(command="help", description="📖 راهنما"),
-        BotCommand(command="profile", description="👤 پروفایل شما"),
-        BotCommand(command="time", description="🕒 زمان و تاریخ تهران"),
-        BotCommand(command="id", description="🆔 نمایش آیدی عددی"),
-        BotCommand(command="joke", description="😂 جوک تصادفی"),
-        BotCommand(command="quote", description="💬 نقل قول انگیزشی"),
-        BotCommand(command="ping", description="✅ وضعیت ربات"),
-        BotCommand(command="admin", description="⚙️ پنل ادمین"),
-        BotCommand(command="cancel", description="❌ لغو بازی حدس عدد"),
-        BotCommand(command="publishgroup", description="📤 انتشار گروه (ادمین)"),
-    ]
-    await bot.set_my_commands(commands)
-    logging.info("✅ دستورات با موفقیت در منوی ربات ثبت شدند.")
+    # ======== ثبت دستورات در کد کاملاً غیرفعال شد ========
+    # برای جلوگیری از تداخل با BotFather، این بخش کاملاً حذف شده
+    logging.info("⏭ ثبت دستورات از طریق BotFather انجام خواهد شد.")
 
     await start_web()
     logging.info("🤖 Starting bot...")
