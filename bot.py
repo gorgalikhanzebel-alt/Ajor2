@@ -30,8 +30,9 @@ logging.basicConfig(level=logging.INFO)
 
 ADMIN_ID = int(os.getenv("ADMIN_ID", 466050034))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", -1001277492702))
+CHANNEL_LINK = "https://t.me/ajor_pareh"  # ✅ لینک واقعی کانال شما
 
-DEFAULT_CAPTION = "📌 عضویت در کانال ما: @Ajor_pareh"
+DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
 
 # ======== توابع کمکی ========
 async def is_admin(user_id: int) -> bool:
@@ -114,7 +115,7 @@ def admin_menu():
 
 def channel_check_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📢 عضویت در کانال", url=f"https://t.me/@Ajor_pareh")],
+        [InlineKeyboardButton(text="📢 عضویت در کانال", url=CHANNEL_LINK)],
         [InlineKeyboardButton(text="✅ عضویت داشتم", callback_data="check_join")]
     ])
 
@@ -147,7 +148,7 @@ async def start(message: types.Message):
             else:
                 await message.answer_document(file_id, caption=caption)
             
-            # files_col.delete_one({"uuid": file_uuid})  # یکبار مصرف
+            # files_col.delete_one({"uuid": file_uuid})
             return
 
     if not users_col.find_one({"_id": user_id}):
@@ -259,7 +260,7 @@ async def stats(callback: types.CallbackQuery):
     await callback.message.answer(f"📊 تعداد کاربران ثبت‌شده: {count}")
     await callback.answer()
 
-# ======== آپلود فایل (دکمه) ========
+# ======== آپلود فایل ========
 @dp.callback_query(lambda c: c.data == "upload_file")
 async def upload_file_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -268,7 +269,6 @@ async def upload_file_callback(callback: types.CallbackQuery):
     await callback.message.answer("📤 لطفاً فایل (عکس، ویدئو، سند) را ارسال کنید.\nبرای کپشن دلخواه، هنگام ارسال فایل، در قسمت کپشن بنویسید.")
     await callback.answer()
 
-# ======== دستور مستقیم /upload ========
 @dp.message(Command("upload"))
 async def upload_file_command(message: types.Message):
     if not await is_admin(message.from_user.id):
@@ -276,7 +276,6 @@ async def upload_file_command(message: types.Message):
         return
     await message.answer("📤 لطفاً فایل (عکس، ویدئو، سند) را ارسال کنید.\nبرای کپشن دلخواه، هنگام ارسال فایل، در قسمت کپشن بنویسید.")
 
-# ======== دریافت فایل ========
 @dp.message(lambda msg: msg.document or msg.photo or msg.video)
 async def handle_file_upload(message: types.Message):
     if not await is_admin(message.from_user.id):
