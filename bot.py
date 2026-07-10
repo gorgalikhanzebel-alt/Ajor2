@@ -161,6 +161,7 @@ def get_tehran_time():
 # ======== منوها ========
 def main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📂 لیست فایل‌ها", callback_data="list_files")],
         [InlineKeyboardButton(text="🎬 دانلود یوتیوب", callback_data="youtube")],
         [InlineKeyboardButton(text="🎮 بازی و سرگرمی", callback_data="game")],
         [InlineKeyboardButton(text="💳 کیف پول", callback_data="wallet"),
@@ -199,6 +200,7 @@ def admin_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📊 آمار کاربران", callback_data="stats")],
         [InlineKeyboardButton(text="📤 آپلود فایل", callback_data="upload_file")],
+        [InlineKeyboardButton(text="🗑 مدیریت فایل‌ها", callback_data="manage_files")],
         [InlineKeyboardButton(text="🔙 برگشت", callback_data="back_main")]
     ])
 
@@ -208,12 +210,48 @@ def channel_check_menu():
         [InlineKeyboardButton(text="✅ عضویت داشتم", callback_data="check_join")]
     ])
 
+# ======== نمایش لیست فایل‌های عمومی ========
+async def show_file_list(message: types.Message):
+    files = list(files_col.find({"is_public": True}).sort("uploaded_at", -1))
+    if not files:
+        await message.answer("📂 هیچ فایل عمومی‌ای وجود ندارد.")
+        return
+    
+    keyboard = []
+    for f in files:
+        btn_text = f.get("name", f"فایل {f['uuid']}")
+        keyboard.append([InlineKeyboardButton(
+            text=f"📎 {btn_text}",
+            callback_data=f"download_{f['uuid']}"
+        )])
+    
+    keyboard.append([InlineKeyboardButton(text="🔙 برگشت", callback_data="back_main")])
+    
+    await message.answer(
+        "📂 **لیست فایل‌های عمومی**\n"
+        "روی هر فایل کلیک کن تا دریافت کنی:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+    )
+
 # ======== دستور /start ========
 @dp.message(Command("start"))
 async def start(message: types.Message):
     user_id = message.from_user.id
     name = message.from_user.first_name
 
+    # اگر کاربر از لینک لیست فایل‌ها آمده باشد
+    if message.text and message.text.startswith("/start files"):
+        if not await is_member(user_id):
+            await message.answer(
+                f"👋 سلام {name}!\n"
+                "برای مشاهده فایل‌ها، لطفاً اول عضو کانال ما بشو:",
+                reply_markup=channel_check_menu()
+            )
+            return
+        await show_file_list(message)
+        return
+
+    # اگر کاربر از لینک اختصاصی فایل آمده باشد (حالت قدیمی)
     if message.text and message.text.startswith("/start file_"):
         file_uuid = message.text.split("_")[1]
         file_data = files_col.find_one({"uuid": file_uuid})
@@ -241,9 +279,11 @@ async def start(message: types.Message):
             await message.answer("❌ فایل مورد نظر یافت نشد.")
             return
 
+    # ثبت کاربر جدید
     if not users_col.find_one({"_id": user_id}):
         users_col.insert_one({"_id": user_id, "name": name})
 
+    # بررسی عضویت در کانال
     if not await is_member(user_id):
         await message.answer(
             f"👋 سلام {name}!\n"
@@ -267,6 +307,42 @@ async def check_join(callback: types.CallbackQuery):
         await callback.message.answer("🚀 منوی اصلی:", reply_markup=main_menu())
     else:
         await callback.answer("❌ هنوز عضو کانال نشدی! اول عضو شو.", show_alert=True)
+
+# ======== دکمه لیست فایل‌ها ========
+@dp.callback_query(lambda c: c.data == "list_files")
+async def list_files_callback(callback: types.CallbackQuery):
+    if not await is_member(callback.from_user.id):
+        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
+        return
+    await show_file_list(callback.message)
+    await callback.answer()
+
+# ======== دانلود فایل با کلیک روی دکمه ========
+@dp.callback_query(lambda c: c.data.startswith("download_"))
+async def download_file(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    if not await is_member(user_id):
+        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
+        return
+    
+    file_uuid = callback.data.split("_")[1]
+    file_data = files_col.find_one({"uuid": file_uuid})
+    if not file_data:
+        await callback.answer("❌ فایل یافت نشد!", show_alert=True)
+        return
+    
+    file_id = file_data["file_id"]
+    file_type = file_data["type"]
+    caption = file_data.get("caption", DEFAULT_CAPTION)
+    
+    if file_type == "photo":
+        await callback.message.answer_photo(file_id, caption=caption)
+    elif file_type == "video":
+        await callback.message.answer_video(file_id, caption=caption)
+    else:
+        await callback.message.answer_document(file_id, caption=caption)
+    
+    await callback.answer("✅ فایل ارسال شد!")
 
 # ======== دانلود یوتیوب ========
 @dp.callback_query(lambda c: c.data == "youtube")
@@ -370,7 +446,7 @@ async def rps_play(callback: types.CallbackQuery):
     await callback.message.answer(f"تو: {user_emoji}\nربات: {bot_emoji}\n\n{result}")
     await callback.answer()
 
-# ======== بازی حدس عدد (اصلاح‌شده) ========
+# ======== بازی حدس عدد ========
 @dp.callback_query(lambda c: c.data == "guess_game")
 async def guess_game(callback: types.CallbackQuery):
     if not await is_member(callback.from_user.id):
@@ -472,6 +548,48 @@ async def stats(callback: types.CallbackQuery):
     await callback.message.answer(f"📊 تعداد کاربران ثبت‌شده: {count}")
     await callback.answer()
 
+# ======== مدیریت فایل‌ها توسط ادمین ========
+@dp.callback_query(lambda c: c.data == "manage_files")
+async def manage_files(callback: types.CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return
+    
+    files = list(files_col.find({"is_public": True}).sort("uploaded_at", -1))
+    if not files:
+        await callback.message.answer("📂 هیچ فایل عمومی‌ای وجود ندارد.")
+        return
+    
+    keyboard = []
+    for f in files:
+        btn_text = f.get("name", f"فایل {f['uuid']}")
+        keyboard.append([InlineKeyboardButton(
+            text=f"❌ حذف {btn_text}",
+            callback_data=f"delete_file_{f['uuid']}"
+        )])
+    keyboard.append([InlineKeyboardButton(text="🔙 برگشت", callback_data="admin_panel")])
+    
+    await callback.message.answer(
+        "🗑️ **مدیریت فایل‌ها**\n"
+        "روی هر فایل کلیک کن تا حذف شود:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+    )
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data.startswith("delete_file_"))
+async def delete_file(callback: types.CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return
+    
+    file_uuid = callback.data.split("_")[2]
+    result = files_col.delete_one({"uuid": file_uuid})
+    if result.deleted_count:
+        await callback.message.answer(f"✅ فایل با موفقیت حذف شد.")
+    else:
+        await callback.message.answer("❌ فایل یافت نشد.")
+    await callback.answer()
+
 # ======== آپلود فایل ========
 @dp.callback_query(lambda c: c.data == "upload_file")
 async def upload_file_callback(callback: types.CallbackQuery):
@@ -519,6 +637,7 @@ async def handle_file_upload(message: types.Message):
         "type": file_type,
         "name": file_name,
         "caption": caption,
+        "is_public": True,  # <-- این فایل در لیست عمومی نمایش داده می‌شود
         "uploaded_at": datetime.now()
     })
 
@@ -527,7 +646,9 @@ async def handle_file_upload(message: types.Message):
 
     await message.answer(
         f"✅ فایل با موفقیت آپلود شد!\n\n"
-        f"🔗 لینک اختصاصی:\n<code>{link}</code>\n\n"
+        f"🔗 لینک اختصاصی (قدیمی):\n<code>{link}</code>\n\n"
+        f"🔗 لینک عمومی (مشاهده همه فایل‌ها):\n"
+        f"<code>https://t.me/{bot_info.username}?start=files</code>\n\n"
         f"📌 کپشن فایل:\n{caption}\n\n"
         f"⚠️ کاربران ابتدا باید عضو کانال شوند تا فایل را دریافت کنند.",
         parse_mode="HTML"
@@ -648,7 +769,7 @@ async def time_command(message: types.Message):
         f"⏰ ساعت: {t.strftime('%H:%M:%S')}"
     )
 
-# ======== دستور /id (اصلاح‌شده) ========
+# ======== دستور /id ========
 @dp.message(Command("id"))
 async def id_command(message: types.Message):
     await message.answer(f"🆔 آیدی عددی شما:\n<code>{message.from_user.id}</code>", parse_mode="HTML")
