@@ -78,7 +78,7 @@ async def ask_ai(query):
 def get_tehran_time():
     return datetime.now(timezone.utc) + timedelta(hours=3, minutes=30)
 
-# ======== منوهای شیشه‌ای (مهم) ========
+# ======== منوهای شیشه‌ای ========
 def main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton("🎬 یوتیوب", callback_data="youtube")],
