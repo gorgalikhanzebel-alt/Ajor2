@@ -23,7 +23,7 @@ client = MongoClient(MONGO_URI)
 db = client["telegram_bot"]
 users_col = db["users"]
 files_col = db["files"]
-banned_col = db["banned"]
+banned_col = db["banned"]  # جدید
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -43,6 +43,7 @@ QUOTES = ["به فکر فردا باش!", "بلند شدن دوباره!", "کد
 FUNNY = ["چی میگی بچه خوشگل؟ 😏", "سیک تو بزن! 😂", "نمیفهمم حاجی!", "چرت و پرت نگو! 🤔"]
 
 guess_games = {}
+admin_state = {}  # برای نگهداری وضعیت ادمین (مانند انتظار برای ورودی)
 
 # ======== توابع ========
 async def is_admin(user_id): return user_id == ADMIN_ID
@@ -336,6 +337,7 @@ async def stats(callback: types.CallbackQuery):
         f"🚫 مسدودها: {banned}\n"
         f"📁 فایل‌ها: {files}"
     )
+    await callback.answer()
 
 # ------- لیست کاربران -------
 @dp.callback_query(lambda c: c.data == "user_list")
@@ -355,48 +357,202 @@ async def user_list(callback: types.CallbackQuery):
             joined = "نامشخص"
         text += f"{i}. {name} (ID: {u['_id']}) - {joined}\n"
     await callback.message.answer(text)
+    await callback.answer()
 
-# ------- جستجوی کاربر -------
+# ------- جستجوی کاربر (با حالت) -------
 @dp.callback_query(lambda c: c.data == "search_user")
 async def search_user(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         return await callback.answer("⛔ دسترسی!", show_alert=True)
+    admin_state[callback.from_user.id] = "waiting_search"
     await callback.message.answer("🔍 آیدی یا نام کاربر رو بفرست:")
     await callback.answer()
 
-@dp.message(lambda msg: msg.text and await is_admin(msg.from_user.id))
-async def handle_search(message: types.Message):
-    if not await is_admin(message.from_user.id): return
-    query = message.text.strip()
-    if query.isdigit():
-        user = users_col.find_one({"_id": int(query)})
-        if user:
-            await show_profile(message, user)
-        else:
-            await message.answer("❌ یافت نشد.")
-    else:
-        users = list(users_col.find({"name": {"$regex": query, "$options": "i"}}).limit(10))
-        if users:
-            text = f"🔍 نتایج '{query}':\n"
-            for u in users:
-                joined = u.get("joined_at", "")
-                if isinstance(joined, datetime):
-                    joined = joined.strftime("%Y-%m-%d")
-                else:
-                    joined = "نامشخص"
-                text += f"👤 {u.get('name', 'نامشخص')} (ID: {u['_id']}) - {joined}\n"
-            await message.answer(text)
-        else:
-            await message.answer("❌ یافت نشد.")
-
-# ------- مشاهده پروفایل -------
+# ------- مشاهده پروفایل (با حالت) -------
 @dp.callback_query(lambda c: c.data == "view_profile")
 async def view_profile(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         return await callback.answer("⛔ دسترسی!", show_alert=True)
+    admin_state[callback.from_user.id] = "waiting_profile"
     await callback.message.answer("👤 آیدی عددی کاربر رو بفرست:")
     await callback.answer()
 
+# ------- مدیریت مسدودها (بن/رفع بن) -------
+@dp.callback_query(lambda c: c.data == "ban_user")
+async def ban_user_prompt(callback: types.CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
+    admin_state[callback.from_user.id] = "waiting_ban"
+    await callback.message.answer("🚫 آیدی عددی کاربر رو برای مسدود بفرست:")
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data == "unban_user")
+async def unban_user_prompt(callback: types.CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
+    admin_state[callback.from_user.id] = "waiting_unban"
+    await callback.message.answer("✅ آیدی عددی کاربر رو برای رفع مسدود بفرست:")
+    await callback.answer()
+
+# ------- مدیریت مسدودها (لیست) -------
+@dp.callback_query(lambda c: c.data == "ban_management")
+async def ban_management(callback: types.CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
+    banned = list(banned_col.find())
+    if banned:
+        text = "🚫 **لیست مسدودها:**\n\n"
+        for b in banned[:15]:
+            text += f"ID: {b['_id']}\n"
+        await callback.message.answer(text)
+    else:
+        await callback.message.answer("✅ هیچ کاربری مسدود نیست.")
+    await callback.answer()
+
+# ------- ارسال همگانی -------
+@dp.callback_query(lambda c: c.data == "broadcast")
+async def broadcast(callback: types.CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
+    admin_state[callback.from_user.id] = "waiting_broadcast"
+    await callback.message.answer("📢 پیام همگانی رو بفرست:")
+    await callback.answer()
+
+# ======== مدیریت گروه (دکمه‌ها) ========
+@dp.callback_query(lambda c: c.data == "group_manage")
+async def group_manage(callback: types.CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
+    await callback.message.answer("⚙️ مدیریت گروه:", reply_markup=group_manage_menu())
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data in ["lock_group", "unlock_group"])
+async def lock_unlock(callback: types.CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
+    can_send = False if callback.data == "lock_group" else True
+    await bot.set_chat_permissions(callback.message.chat.id, ChatPermissions(can_send_messages=can_send))
+    await callback.message.answer("🔒 قفل شد!" if not can_send else "🔓 باز شد!")
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data == "clear_messages")
+async def clear_messages(callback: types.CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
+    admin_state[callback.from_user.id] = "waiting_clear"
+    await callback.message.answer("🧹 تعداد پیام بفرست (مثلاً 10):")
+    await callback.answer()
+
+# ============================================
+# ======== مدیریت ورودی‌های ادمین (حالت‌ها) ========
+# ============================================
+@dp.message()
+async def admin_input_handler(message: types.Message):
+    user_id = message.from_user.id
+    if not await is_admin(user_id):
+        return
+    state = admin_state.get(user_id)
+    if not state:
+        return
+
+    # فقط در پیوی کار کن
+    if message.chat.type != "private":
+        return
+
+    text = message.text.strip()
+
+    if state == "waiting_search":
+        admin_state.pop(user_id, None)
+        if text.isdigit():
+            user = users_col.find_one({"_id": int(text)})
+            if user:
+                await show_profile(message, user)
+            else:
+                await message.answer("❌ کاربری با این آیدی یافت نشد.")
+        else:
+            users = list(users_col.find({"name": {"$regex": text, "$options": "i"}}).limit(10))
+            if users:
+                res = f"🔍 نتایج '{text}':\n"
+                for u in users:
+                    joined = u.get("joined_at", "")
+                    if isinstance(joined, datetime):
+                        joined = joined.strftime("%Y-%m-%d")
+                    else:
+                        joined = "نامشخص"
+                    res += f"👤 {u.get('name', 'نامشخص')} (ID: {u['_id']}) - {joined}\n"
+                await message.answer(res)
+            else:
+                await message.answer("❌ کاربری یافت نشد.")
+
+    elif state == "waiting_profile":
+        admin_state.pop(user_id, None)
+        if text.isdigit():
+            user = users_col.find_one({"_id": int(text)})
+            if user:
+                await show_profile(message, user)
+            else:
+                await message.answer("❌ کاربر یافت نشد.")
+        else:
+            await message.answer("❌ لطفاً یک آیدی عددی معتبر بفرست.")
+
+    elif state == "waiting_ban":
+        admin_state.pop(user_id, None)
+        if text.isdigit():
+            user_id_ban = int(text)
+            if user_id_ban == ADMIN_ID:
+                return await message.answer("❌ خودت رو مسدود نکن!")
+            if await is_banned(user_id_ban):
+                await message.answer(f"⚠️ کاربر {user_id_ban} قبلاً مسدود است.")
+            else:
+                banned_col.insert_one({"_id": user_id_ban, "reason": "ادمین"})
+                await message.answer(f"✅ کاربر {user_id_ban} مسدود شد.")
+                try:
+                    await bot.send_message(user_id_ban, "🚫 توسط ادمین مسدود شدی!")
+                except: pass
+        else:
+            await message.answer("❌ لطفاً یک آیدی عددی معتبر بفرست.")
+
+    elif state == "waiting_unban":
+        admin_state.pop(user_id, None)
+        if text.isdigit():
+            user_id_unban = int(text)
+            if await is_banned(user_id_unban):
+                banned_col.delete_one({"_id": user_id_unban})
+                await message.answer(f"✅ مسدودیت {user_id_unban} رفع شد.")
+            else:
+                await message.answer(f"❌ کاربر {user_id_unban} مسدود نیست.")
+        else:
+            await message.answer("❌ لطفاً یک آیدی عددی معتبر بفرست.")
+
+    elif state == "waiting_broadcast":
+        admin_state.pop(user_id, None)
+        users = users_col.find()
+        sent = 0
+        for user in users:
+            try:
+                await bot.send_message(user["_id"], text)
+                sent += 1
+            except: pass
+        await message.answer(f"✅ پیام به {sent} کاربر ارسال شد.")
+
+    elif state == "waiting_clear":
+        admin_state.pop(user_id, None)
+        if text.isdigit():
+            count = int(text)
+            if count > 100:
+                return await message.answer("❌ حداکثر ۱۰۰.")
+            if message.chat.type == "private":
+                return await message.answer("❌ این دستور فقط در گروه کار می‌کند.")
+            deleted = 0
+            async for msg in bot.get_chat_history(message.chat.id, limit=count):
+                if msg.message_id != message.message_id:
+                    await msg.delete()
+                    deleted += 1
+            await message.answer(f"✅ {deleted} پیام پاک شد.")
+        else:
+            await message.answer("❌ لطفاً یک عدد معتبر بفرست.")
+
+# ======== تابع نمایش پروفایل ========
 async def show_profile(message, user):
     name = user.get("name", "نامشخص")
     uid = user.get("_id", "نامشخص")
@@ -414,108 +570,6 @@ async def show_profile(message, user):
         f"🚫 وضعیت: {'مسدود' if banned else 'فعال'}"
     )
     await message.answer(text)
-
-@dp.message(lambda msg: msg.text and msg.text.isdigit() and await is_admin(msg.from_user.id))
-async def view_profile_cmd(message: types.Message):
-    user_id = int(message.text)
-    user = users_col.find_one({"_id": user_id})
-    if user:
-        await show_profile(message, user)
-    else:
-        await message.answer("❌ کاربر یافت نشد.")
-
-# ------- ارسال همگانی -------
-@dp.callback_query(lambda c: c.data == "broadcast")
-async def broadcast(callback: types.CallbackQuery):
-    if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی!", show_alert=True)
-    await callback.message.answer("📢 پیام همگانی رو بفرست (به این پیام ریپلی کن):")
-    await callback.answer()
-
-@dp.message(lambda msg: msg.text and msg.reply_to_message and await is_admin(msg.from_user.id))
-async def handle_broadcast(message: types.Message):
-    if not await is_admin(message.from_user.id): return
-    if "پیام همگانی" in message.reply_to_message.text:
-        text = message.text
-        users = users_col.find()
-        sent = 0
-        for user in users:
-            try:
-                await bot.send_message(user["_id"], text)
-                sent += 1
-            except: pass
-        await message.answer(f"✅ به {sent} کاربر ارسال شد.")
-
-# ------- مدیریت مسدودها -------
-@dp.callback_query(lambda c: c.data == "ban_management")
-async def ban_management(callback: types.CallbackQuery):
-    if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی!", show_alert=True)
-    banned = list(banned_col.find())
-    if banned:
-        text = "🚫 **لیست مسدودها:**\n\n"
-        for b in banned[:15]:
-            text += f"ID: {b['_id']}\n"
-        await callback.message.answer(text)
-    else:
-        await callback.message.answer("✅ هیچ کاربری مسدود نیست.")
-
-@dp.callback_query(lambda c: c.data in ["ban_user", "unban_user"])
-async def ban_actions(callback: types.CallbackQuery):
-    if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی!", show_alert=True)
-    action = "مسدود" if callback.data == "ban_user" else "رفع مسدود"
-    await callback.message.answer(f"🚫 آیدی رو برای {action} بفرست:")
-    await callback.answer()
-
-@dp.message(lambda msg: msg.text and msg.text.isdigit() and await is_admin(msg.from_user.id))
-async def ban_unban_cmd(message: types.Message):
-    user_id = int(message.text)
-    if user_id == ADMIN_ID:
-        return await message.answer("❌ خودت رو مسدود نکن!")
-    if await is_banned(user_id):
-        banned_col.delete_one({"_id": user_id})
-        await message.answer(f"✅ مسدودیت {user_id} رفع شد.")
-    else:
-        banned_col.insert_one({"_id": user_id, "reason": "ادمین"})
-        await message.answer(f"✅ {user_id} مسدود شد.")
-        try:
-            await bot.send_message(user_id, "🚫 توسط ادمین مسدود شدی!")
-        except: pass
-
-# ======== مدیریت گروه ========
-@dp.callback_query(lambda c: c.data == "group_manage")
-async def group_manage(callback: types.CallbackQuery):
-    if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی!", show_alert=True)
-    await callback.message.answer("⚙️ مدیریت گروه:", reply_markup=group_manage_menu())
-
-@dp.callback_query(lambda c: c.data in ["lock_group", "unlock_group"])
-async def lock_unlock(callback: types.CallbackQuery):
-    if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی!", show_alert=True)
-    can_send = False if callback.data == "lock_group" else True
-    await bot.set_chat_permissions(callback.message.chat.id, ChatPermissions(can_send_messages=can_send))
-    await callback.message.answer("🔒 قفل شد!" if not can_send else "🔓 باز شد!")
-
-@dp.callback_query(lambda c: c.data == "clear_messages")
-async def clear_messages(callback: types.CallbackQuery):
-    if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی!", show_alert=True)
-    await callback.message.answer("🧹 تعداد پیام بفرست (مثلاً 10):")
-    await callback.answer()
-
-@dp.message(lambda msg: msg.text and msg.text.isdigit() and await is_admin(msg.from_user.id))
-async def clear_cmd(message: types.Message):
-    count = int(message.text)
-    if count > 100:
-        return await message.answer("❌ حداکثر ۱۰۰.")
-    deleted = 0
-    async for msg in bot.get_chat_history(message.chat.id, limit=count):
-        if msg.message_id != message.message_id:
-            await msg.delete()
-            deleted += 1
-    await message.answer(f"✅ {deleted} پیام پاک شد.")
 
 # ============================================
 # ======== آپلود فایل ========
@@ -595,7 +649,7 @@ async def admin_command(message: types.Message):
     await message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
 
 # ============================================
-# ======== پیام‌های متنی ========
+# ======== پیام‌های متنی (غیرادمین) ========
 # ============================================
 @dp.message()
 async def handle_text(message: types.Message):
