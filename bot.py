@@ -33,74 +33,36 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", 466050034))
 CHANNEL_ID = -1001277492702
 CHANNEL_LINK = "https://t.me/ajor_pareh"
 DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
-
 OPENROUTER_API_KEY = "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"
 
-# ======== دیکشنری‌ها ========
-GREETINGS = {
-    "سلام": "سلام! 👋", "خوبی": "خوبم ممنون! تو چطوری؟", "چطوری": "خوبم، ممنون!",
-    "مرسی": "خواهش می‌کنم! 🤗", "خداحافظ": "خداحافظ! 👋", "صبح بخیر": "صبح بخیر! ☀️",
-    "شب بخیر": "شب بخیر! 🌙", "خوش اومدی": "خوش اومدی! ✨", "چه خبر": "سلامت باشی! 😊",
-    "درود": "درود بر تو! 🌹", "علیک": "علیک السلام! 🙏", "ایول": "ایول داش! 🔥",
-    "دمت گرم": "دمت گرم داداش! ❤️", "چاکرم": "چاکرم استاد! 🙌", "سپاس": "سپاسگزارم! 🌺"
-}
-
-JOKES = [
-    "چرا مرغ از جاده رد شد؟ برای اینکه به اون طرف برسه! 😂",
-    "بهترین زبان برنامه‌نویسی؟ پایتون! 🐍",
-    "یک پنگوئن به یخچال نگاه کرد و گفت: چقدر خنک! 😄",
-    "چرا ریاضیات غمگینه؟ چون مسائلش بی‌جوابه!",
-    "چی می‌شه اگه نارگیل رو بندازی تو رودخونه؟ آب می‌شه!",
-    "یک گربه به کامپیوتر گفت: منوس! 😹",
-    "چرا برنامه‌نویس‌ها عاشق قهوه‌ان؟ ☕",
-    "بهترین شوخی برنامه‌نویسی؟ null pointer exception! 😂",
-    "چرا تابع main همیشه اول میاد؟ چون مامانش گفته! 😄",
-    "تفاوت بین یه برنامه‌نویس و یه هنرمند؟ یکی باگ می‌نویسه، یکی نقاشی! 🎨"
-]
-
-QUOTES = [
-    "همیشه به فکر فردا باش!", "موفقیت یعنی بلند شدن دوباره!",
-    "کد بزن و لذت ببر!", "زندگی مثل یه جعبه شکلاته!",
-    "بهترین زمان برای شروع، الان است!", "هیچ چیز غیرممکن نیست، فقط زمان می‌بره! ⏳",
-    "با امید و تلاش، قله‌ها فتح می‌شوند! 🏔️", "لبخند بزن، دنیا لبخند می‌زند! 😊",
-    "هر روز یه فرصت تازه برای شروع دوباره است! 🌅",
-    "موفقیت یعنی بلند شدن هر بار که زمین می‌خوری! 💪"
-]
-
-FUNNY = [
-    "چی میگی بچه خوشگل؟ 😏", "سیک تو بزن تا سیکمو نزدن 😂",
-    "نمیفهمم حاجی چی میگی", "این چرت و پرتا چیه میگی مردک 🤔",
-    "به نظرم ط ی چیزی زدی اینارو میگی"
-]
+# ======== دیکشنری‌های سبک ========
+GREETINGS = {"سلام": "سلام! 👋", "خوبی": "خوبم ممنون!", "چطوری": "خوبم!", "مرسی": "خواهش!", "خداحافظ": "خداحافظ! 👋", "صبح بخیر": "صبح بخیر! ☀️", "شب بخیر": "شب بخیر! 🌙", "خوش اومدی": "خوش اومدی! ✨", "درود": "درود! 🌹"}
+JOKES = ["چرا مرغ از جاده رد شد؟ 😂", "پایتون بهترین زبان! 🐍", "پنگوئن گفت چقدر خنک! 😄", "ریاضیات غمگینه؟ بی‌جوابه!", "نارگیل تو رودخونه آب میشه!"]
+QUOTES = ["به فکر فردا باش!", "بلند شدن دوباره!", "کد بزن لذت ببر!", "زندگی مثل شکلاته!", "بهترین زمان الان است!"]
+FUNNY = ["چی میگی بچه خوشگل؟ 😏", "سیک تو بزن! 😂", "نمیفهمم حاجی!"]
 
 guess_games = {}
 
 # ======== توابع ========
-async def is_admin(user_id: int) -> bool:
-    return user_id == ADMIN_ID
-
-async def is_banned(user_id: int) -> bool:
-    return banned_col.find_one({"_id": user_id}) is not None
-
-async def is_member(user_id: int) -> bool:
+async def is_admin(user_id): return user_id == ADMIN_ID
+async def is_banned(user_id): return banned_col.find_one({"_id": user_id}) is not None
+async def is_member(user_id):
     try:
         member = await bot.get_chat_member(CHANNEL_ID, user_id)
         return member.status in ["member", "administrator", "creator"]
-    except:
-        return False
+    except: return False
 
-async def ask_ai(query: str) -> str:
+async def ask_ai(query):
     try:
         async with aiohttp.ClientSession() as session:
             url = "https://openrouter.ai/api/v1/chat/completions"
             headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
-            data = {"model": "google/gemini-2.0-flash-lite-001", "messages": [{"role": "user", "content": query}], "max_tokens": 500}
+            data = {"model": "google/gemini-2.0-flash-lite-001", "messages": [{"role": "user", "content": query}], "max_tokens": 300}
             async with session.post(url, headers=headers, json=data, timeout=10) as resp:
                 if resp.status == 200:
                     result = await resp.json()
                     return result['choices'][0]['message']['content']
-    except:
-        pass
+    except: pass
     try:
         async with aiohttp.ClientSession() as session:
             url = f"https://api.nexra.aryan.ir/v1/chat/gpt?text={query}"
@@ -109,8 +71,7 @@ async def ask_ai(query: str) -> str:
                     data = await resp.json()
                     if data.get("status") == "success" and data.get("data"):
                         return data["data"].strip()
-    except:
-        pass
+    except: pass
     return None
 
 def get_tehran_time():
@@ -120,16 +81,16 @@ def get_tehran_time():
 def main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton("🎬 دانلود یوتیوب", callback_data="youtube")],
-        [InlineKeyboardButton("🎮 بازی و سرگرمی", callback_data="game")],
-        [InlineKeyboardButton("💳 کیف پول", callback_data="wallet"), InlineKeyboardButton("💰 شارژ حساب", callback_data="charge")],
-        [InlineKeyboardButton("🛠 پشتیبانی", callback_data="support"), InlineKeyboardButton("👤 حساب کاربری", callback_data="profile_user")],
+        [InlineKeyboardButton("🎮 بازی", callback_data="game")],
+        [InlineKeyboardButton("💳 کیف پول", callback_data="wallet"), InlineKeyboardButton("💰 شارژ", callback_data="charge")],
+        [InlineKeyboardButton("🛠 پشتیبانی", callback_data="support"), InlineKeyboardButton("👤 حساب", callback_data="profile_user")],
         [InlineKeyboardButton("⚙️ پنل ادمین", callback_data="admin_panel")]
     ])
 
 def game_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton("🎲 تاس", callback_data="dice"), InlineKeyboardButton("🎯 دارت", callback_data="dart")],
-        [InlineKeyboardButton("🪨 سنگ‌کاغذ‌قیچی", callback_data="rps")],
+        [InlineKeyboardButton("🪨 سنگ‌کاغذ", callback_data="rps")],
         [InlineKeyboardButton("🔢 حدس عدد", callback_data="guess_game")],
         [InlineKeyboardButton("🪙 شیر یا خط", callback_data="coin_flip")],
         [InlineKeyboardButton("🔙 برگشت", callback_data="back_main")]
@@ -157,7 +118,7 @@ def admin_menu():
         [InlineKeyboardButton("📢 همگانی", callback_data="broadcast")],
         [InlineKeyboardButton("🔍 جستجو", callback_data="search_user")],
         [InlineKeyboardButton("🚫 مسدودها", callback_data="ban_management")],
-        [InlineKeyboardButton("⚙️ مدیریت گروه", callback_data="group_manage")],
+        [InlineKeyboardButton("⚙️ گروه", callback_data="group_manage")],
         [InlineKeyboardButton("🔙 برگشت", callback_data="back_main")]
     ])
 
@@ -171,49 +132,46 @@ def group_manage_menu():
 
 def channel_check_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton("📢 عضویت در کانال", url=CHANNEL_LINK)],
+        [InlineKeyboardButton("📢 عضویت", url=CHANNEL_LINK)],
         [InlineKeyboardButton("✅ عضویت داشتم", callback_data="check_join")]
     ])
 
 # ============================================
-# ======== دستور /start ========
+# ======== START ========
 # ============================================
 @dp.message(Command("start"))
 async def start(message: types.Message):
     user_id = message.from_user.id
     name = message.from_user.first_name
     if await is_banned(user_id):
-        return await message.answer("🚫 شما مسدود هستید!")
+        return await message.answer("🚫 مسدود هستید!")
     if message.text and message.text.startswith("/start file_"):
         file_uuid = message.text.split("_")[1]
         file_data = files_col.find_one({"uuid": file_uuid})
         if file_data:
             if not await is_member(user_id):
-                return await message.answer(f"👋 سلام {name}!\nبرای دریافت فایل، عضو کانال بشو:", reply_markup=channel_check_menu())
+                return await message.answer(f"👋 {name}!\nبرای دریافت فایل، عضو کانال بشو:", reply_markup=channel_check_menu())
             file_id, file_type, caption = file_data["file_id"], file_data["type"], file_data.get("caption", DEFAULT_CAPTION)
-            if file_type == "photo":
-                await message.answer_photo(file_id, caption=caption)
-            elif file_type == "video":
-                await message.answer_video(file_id, caption=caption)
-            else:
-                await message.answer_document(file_id, caption=caption)
+            if file_type == "photo": await message.answer_photo(file_id, caption=caption)
+            elif file_type == "video": await message.answer_video(file_id, caption=caption)
+            else: await message.answer_document(file_id, caption=caption)
             return
         return await message.answer("❌ فایل یافت نشد.")
     if not users_col.find_one({"_id": user_id}):
         users_col.insert_one({"_id": user_id, "name": name, "joined_at": datetime.now()})
     if not await is_member(user_id):
-        return await message.answer(f"👋 سلام {name}!\nبرای استفاده از ربات، عضو کانال بشو:", reply_markup=channel_check_menu())
-    await message.answer(f"🚀 سلام {name}!\nبه ربات خوش آمدی.", reply_markup=main_menu())
+        return await message.answer(f"👋 {name}!\nبرای استفاده، عضو کانال بشو:", reply_markup=channel_check_menu())
+    await message.answer(f"🚀 سلام {name}!", reply_markup=main_menu())
 
 @dp.callback_query(lambda c: c.data == "check_join")
 async def check_join(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id):
-        return await callback.answer("🚫 مسدود هستید!", show_alert=True)
+        return await callback.answer("🚫 مسدود!", show_alert=True)
     if await is_member(callback.from_user.id):
-        await callback.message.edit_text("✅ ممنون! حالا می‌تونی استفاده کنی.")
+        await callback.message.edit_text("✅ ممنون!")
         await callback.message.answer("🚀 منوی اصلی:", reply_markup=main_menu())
     else:
-        await callback.answer("❌ هنوز عضو نشدی!", show_alert=True)
+        await callback.answer("❌ عضو نشدی!", show_alert=True)
 
 # ============================================
 # ======== یوتیوب ========
@@ -221,7 +179,7 @@ async def check_join(callback: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data == "youtube")
 async def youtube(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id) or not await is_member(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
     await callback.message.answer("🎬 لینک یوتیوب را بفرست:")
     await callback.answer()
 
@@ -237,19 +195,19 @@ async def get_youtube(message: types.Message):
         else:
             await message.answer("❌ خطا!")
     except:
-        await message.answer("❌ لینک معتبر نیست.")
+        await message.answer("❌ لینک نامعتبر!")
 
 # ============================================
-# ======== منوی اصلی ========
+# ======== منو اصلی ========
 # ============================================
 @dp.callback_query(lambda c: c.data in ["wallet", "charge", "support", "profile_user"])
 async def menu_items(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id):
-        return await callback.answer("🚫 مسدود هستید!", show_alert=True)
+        return await callback.answer("🚫 مسدود!", show_alert=True)
     data = {
         "wallet": "💳 کیف پول: ۰ تومان",
-        "charge": "💰 شارژ: ۱۰K, ۵۰K, ۱۰۰K تومان",
-        "support": "🛠 پشتیبانی: @AdminUsername",
+        "charge": "💰 شارژ: ۱۰K, ۵۰K, ۱۰۰K",
+        "support": "🛠 @AdminUsername",
         "profile_user": f"👤 {callback.from_user.full_name}\n🆔 {callback.from_user.id}"
     }
     await callback.message.answer(data[callback.data])
@@ -261,14 +219,14 @@ async def menu_items(callback: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data == "game")
 async def game(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id) or not await is_member(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
-    await callback.message.answer("🎮 بازی انتخاب کن:", reply_markup=game_menu())
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
+    await callback.message.answer("🎮 انتخاب کن:", reply_markup=game_menu())
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data in ["dice", "dart"])
 async def dice_games(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id) or not await is_member(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
     emoji = "🎲" if callback.data == "dice" else "🎯"
     await callback.message.answer_dice(emoji=emoji)
     await callback.answer()
@@ -276,14 +234,14 @@ async def dice_games(callback: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data == "rps")
 async def rps(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id) or not await is_member(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
     await callback.message.answer("🪨 انتخاب کن:", reply_markup=rps_menu())
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data in ["rps_stone", "rps_paper", "rps_scissors"])
 async def rps_play(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id) or not await is_member(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
     choices = {"rps_stone": "🪨 سنگ", "rps_paper": "📄 کاغذ", "rps_scissors": "✂️ قیچی"}
     beats = {"rps_stone": "rps_scissors", "rps_paper": "rps_stone", "rps_scissors": "rps_paper"}
     user = callback.data
@@ -291,23 +249,23 @@ async def rps_play(callback: types.CallbackQuery):
     if user == bot: result = "🤝 مساوی!"
     elif beats[user] == bot: result = "🎉 بردی!"
     else: result = "😢 باختی!"
-    await callback.message.answer(f"تو: {choices[user]}\nربات: {choices[bot]}\n\n{result}")
+    await callback.message.answer(f"تو: {choices[user]}\nربات: {choices[bot]}\n{result}")
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data == "guess_game")
 async def guess_game(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id) or not await is_member(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
     number = random.randint(1, 20)
     guess_games[callback.from_user.id] = {"number": number, "attempts": 0}
-    await callback.message.answer("🔢 عدد ۱ تا ۲۰ رو بفرست (برای لغو /cancel)")
+    await callback.message.answer("🔢 عدد ۱ تا ۲۰ بفرست (/cancel لغو)")
     await callback.answer()
 
 @dp.message(Command("cancel"))
 async def cancel_guess(message: types.Message):
     if message.from_user.id in guess_games:
         del guess_games[message.from_user.id]
-        await message.answer("❌ بازی لغو شد.")
+        await message.answer("❌ لغو شد.")
 
 @dp.message(lambda msg: msg.text and msg.text.isdigit())
 async def handle_guess(message: types.Message):
@@ -328,17 +286,17 @@ async def handle_guess(message: types.Message):
 @dp.callback_query(lambda c: c.data == "coin_flip")
 async def coin_flip(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id) or not await is_member(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
     await callback.message.answer("🪙 شیر یا خط؟", reply_markup=coin_menu())
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data in ["coin_heads", "coin_tails"])
 async def coin_play(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id) or not await is_member(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
     user = "شیر" if callback.data == "coin_heads" else "خط"
     bot = random.choice(["شیر", "خط"])
-    await callback.message.answer(f"تو: {user}\nربات: {bot}\n\n{'🎉 بردی!' if user == bot else '😢 باختی!'}")
+    await callback.message.answer(f"تو: {user}\nربات: {bot}\n{'🎉' if user == bot else '😢'}")
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data in ["back_main", "back_game"])
@@ -355,45 +313,44 @@ async def back(callback: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data == "admin_panel")
 async def admin_panel(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
     await callback.message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data == "stats")
 async def stats(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
     total = users_col.count_documents({})
     banned = banned_col.count_documents({})
     files = files_col.count_documents({})
-    await callback.message.answer(f"📊 کل: {total}\n🚫 مسدود: {banned}\n📁 فایل‌ها: {files}")
-    await callback.answer()
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today = users_col.count_documents({"joined_at": {"$gte": today_start}})
+    await callback.message.answer(f"📊 کل: {total}\n📅 امروز: {today}\n🚫 مسدود: {banned}\n📁 فایل‌ها: {files}")
 
 @dp.callback_query(lambda c: c.data == "user_list")
 async def user_list(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
-    users = list(users_col.find().sort("joined_at", -1).limit(20))
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
+    users = list(users_col.find().sort("joined_at", -1).limit(15))
     if not users:
         return await callback.message.answer("📭 کاربری نیست.")
-    text = "📋 ۲۰ کاربر اخیر:\n"
+    text = "📋 کاربران اخیر:\n"
     for i, u in enumerate(users, 1):
         name = u.get("name", "نامشخص")
         text += f"{i}. {name} (ID: {u['_id']})\n"
     await callback.message.answer(text)
-    await callback.answer()
 
 @dp.callback_query(lambda c: c.data == "search_user")
 async def search_user(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
-    await callback.message.answer("🔍 آیدی یا نام کاربر رو بفرست:")
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
+    await callback.message.answer("🔍 آیدی یا نام بفرست:")
     await callback.answer()
 
 @dp.message(lambda msg: msg.text and await is_admin(msg.from_user.id))
 async def handle_search(message: types.Message):
-    if not await is_admin(message.from_user.id):
-        return
+    if not await is_admin(message.from_user.id): return
     query = message.text.strip()
     if query.isdigit():
         user = users_col.find_one({"_id": int(query)})
@@ -414,15 +371,14 @@ async def handle_search(message: types.Message):
 @dp.callback_query(lambda c: c.data == "broadcast")
 async def broadcast(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
-    await callback.message.answer("📢 پیام رو بفرست (به این پیام ریپلی کن):")
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
+    await callback.message.answer("📢 پیام رو بفرست (ریپلی کن):")
     await callback.answer()
 
 @dp.message(lambda msg: msg.text and msg.reply_to_message and await is_admin(msg.from_user.id))
 async def handle_broadcast(message: types.Message):
-    if not await is_admin(message.from_user.id):
-        return
-    if message.reply_to_message.text and "پیام رو بفرست" in message.reply_to_message.text:
+    if not await is_admin(message.from_user.id): return
+    if "پیام رو بفرست" in message.reply_to_message.text:
         text = message.text
         users = users_col.find()
         sent = 0
@@ -430,28 +386,26 @@ async def handle_broadcast(message: types.Message):
             try:
                 await bot.send_message(user["_id"], text)
                 sent += 1
-            except:
-                pass
+            except: pass
         await message.answer(f"✅ به {sent} کاربر ارسال شد.")
 
 @dp.callback_query(lambda c: c.data == "ban_management")
 async def ban_management(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
     banned = list(banned_col.find())
     if banned:
-        text = "🚫 لیست مسدودها:\n"
-        for b in banned[:20]:
+        text = "🚫 مسدودها:\n"
+        for b in banned[:15]:
             text += f"ID: {b['_id']}\n"
         await callback.message.answer(text)
     else:
         await callback.message.answer("✅ هیچکس مسدود نیست.")
-    await callback.answer()
 
 @dp.callback_query(lambda c: c.data in ["ban_user", "unban_user"])
 async def ban_actions(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
     action = "مسدود" if callback.data == "ban_user" else "رفع مسدود"
     await callback.message.answer(f"🚫 آیدی رو برای {action} بفرست:")
     await callback.answer()
@@ -459,41 +413,37 @@ async def ban_actions(callback: types.CallbackQuery):
 @dp.message(lambda msg: msg.text and msg.text.isdigit() and await is_admin(msg.from_user.id))
 async def ban_unban_cmd(message: types.Message):
     user_id = int(message.text)
+    if user_id == ADMIN_ID:
+        return await message.answer("❌ خودت نه!")
     if await is_banned(user_id):
         banned_col.delete_one({"_id": user_id})
         await message.answer(f"✅ مسدودیت {user_id} رفع شد.")
     else:
-        if user_id == ADMIN_ID:
-            return await message.answer("❌ خودت رو مسدود نکن!")
         banned_col.insert_one({"_id": user_id, "reason": "ادمین"})
         await message.answer(f"✅ {user_id} مسدود شد.")
         try:
-            await bot.send_message(user_id, "🚫 توسط ادمین مسدود شدی!")
-        except:
-            pass
+            await bot.send_message(user_id, "🚫 مسدود شدی!")
+        except: pass
 
-# ======== مدیریت گروه ========
 @dp.callback_query(lambda c: c.data == "group_manage")
 async def group_manage(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
-    await callback.message.answer("⚙️ مدیریت گروه:", reply_markup=group_manage_menu())
-    await callback.answer()
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
+    await callback.message.answer("⚙️ گروه:", reply_markup=group_manage_menu())
 
 @dp.callback_query(lambda c: c.data in ["lock_group", "unlock_group"])
 async def lock_unlock(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
     can_send = False if callback.data == "lock_group" else True
     await bot.set_chat_permissions(callback.message.chat.id, ChatPermissions(can_send_messages=can_send))
-    await callback.message.answer("🔒 قفل شد!" if not can_send else "🔓 باز شد!")
-    await callback.answer()
+    await callback.message.answer("🔒 قفل!" if not can_send else "🔓 باز!")
 
 @dp.callback_query(lambda c: c.data == "clear_messages")
 async def clear_messages(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
-    await callback.message.answer("🧹 تعداد پیام رو بفرست (مثلاً 10):")
+        return await callback.answer("⛔ دسترسی!", show_alert=True)
+    await callback.message.answer("🧹 تعداد پیام بفرست (مثلاً 10):")
     await callback.answer()
 
 @dp.message(lambda msg: msg.text and msg.text.isdigit() and await is_admin(msg.from_user.id))
@@ -542,24 +492,15 @@ async def handle_file_upload(message: types.Message):
 @dp.message(Command("help"))
 async def help_command(message: types.Message):
     await message.answer(
-        "📖 **راهنما:**\n"
-        "/start - شروع\n"
-        "/time - زمان تهران\n"
-        "/id - آیدی من\n"
-        "/joke - جوک\n"
-        "/quote - نقل قول\n"
-        "/ping - وضعیت\n"
-        "/profile - پروفایل\n"
-        "/admin - پنل ادمین\n"
-        "/cancel - لغو حدس عدد\n"
-        "/upload - آپلود فایل (ادمین)"
-    )
+        "📖 راهنما:\n"
+        "/start - شروع\n/time - زمان تهران\n/id - آیدی\n/profile - پروفایل\n"
+        "/joke - جوک\n/quote - نقل قول\n/ping - وضعیت\n/admin - پنل\n/cancel - لغو حدس\n/upload - آپلود")
 
 @dp.message(Command("time"))
 async def time_command(message: types.Message):
     t = get_tehran_time()
     days = ["دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه", "شنبه", "یک‌شنبه"]
-    await message.answer(f"🕒 {t.strftime('%Y/%m/%d')} - {days[t.weekday()]}\n⏰ {t.strftime('%H:%M:%S')}")
+    await message.answer(f"🕒 {t.strftime('%Y/%m/%d')} {days[t.weekday()]}\n⏰ {t.strftime('%H:%M:%S')}")
 
 @dp.message(Command("id"))
 async def id_command(message: types.Message):
@@ -571,7 +512,7 @@ async def profile_command(message: types.Message):
     if user_data:
         joined = user_data.get("joined_at")
         if isinstance(joined, datetime):
-            joined = joined.strftime("%Y-%m-%d %H:%M")
+            joined = joined.strftime("%Y-%m-%d")
         else:
             joined = "نامشخص"
         await message.answer(f"👤 {message.from_user.full_name}\n🆔 {message.from_user.id}\n📅 {joined}")
@@ -579,21 +520,18 @@ async def profile_command(message: types.Message):
         await message.answer(f"👤 {message.from_user.full_name}\n🆔 {message.from_user.id}")
 
 @dp.message(Command("joke"))
-async def joke(message: types.Message):
-    await message.answer(random.choice(JOKES))
+async def joke(message: types.Message): await message.answer(random.choice(JOKES))
 
 @dp.message(Command("quote"))
-async def quote(message: types.Message):
-    await message.answer(f"💬 {random.choice(QUOTES)}")
+async def quote(message: types.Message): await message.answer(f"💬 {random.choice(QUOTES)}")
 
 @dp.message(Command("ping"))
-async def ping(message: types.Message):
-    await message.answer("✅ ربات آنلاین و سالم است!")
+async def ping(message: types.Message): await message.answer("✅ آنلاین!")
 
 @dp.message(Command("admin"))
 async def admin_command(message: types.Message):
     if not await is_admin(message.from_user.id):
-        return await message.answer("⛔ دسترسی ندارید!")
+        return await message.answer("⛔ دسترسی!")
     await message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
 
 # ============================================
@@ -601,11 +539,10 @@ async def admin_command(message: types.Message):
 # ============================================
 @dp.message()
 async def handle_text(message: types.Message):
-    if message.chat.type != "private":
-        return
+    if message.chat.type != "private": return
     user_id = message.from_user.id
     if await is_banned(user_id):
-        return await message.answer("🚫 مسدود هستید!")
+        return await message.answer("🚫 مسدود!")
     if not await is_member(user_id):
         return await message.answer("❌ عضو کانال نیستی!", reply_markup=channel_check_menu())
     text = message.text.strip().lower()
