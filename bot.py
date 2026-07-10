@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, BotCommand
 from pymongo import MongoClient
 from aiohttp import web
 from pytube import YouTube
@@ -124,35 +124,39 @@ QUOTES = [
     "بهترین زمان برای شروع، الان است!"
 ]
 
-# ======== منوها ========
+# ======== منوی شیشه‌ای (مثل ربات نمونه) ========
 def main_menu():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎬 دانلود یوتیوب", callback_data="youtube")],
-        [InlineKeyboardButton(text="🎮 بازی و سرگرمی", callback_data="game")],
-        [InlineKeyboardButton(text="⚙️ پنل ادمین", callback_data="admin_panel")]
-    ])
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🎬 دانلود یوتیوب")],
+            [KeyboardButton(text="🎮 بازی و سرگرمی")],
+            [KeyboardButton(text="⚙️ پنل ادمین")],
+            [KeyboardButton(text="📤 آپلود فایل")],
+            [KeyboardButton(text="📞 ارسال شماره همراه", request_contact=True)],  # 👈 مثل ربات نمونه
+            [KeyboardButton(text="❓ راهنما")],
+        ],
+        resize_keyboard=True
+    )
 
 def game_menu():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎲 تاس", callback_data="dice"),
-         InlineKeyboardButton(text="🎯 دارت", callback_data="dart")],
-        [InlineKeyboardButton(text="🪨 سنگ‌کاغذ‌قیچی", callback_data="rps")],
-        [InlineKeyboardButton(text="🔙 برگشت", callback_data="back_main")]
-    ])
-
-def rps_menu():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🪨 سنگ", callback_data="rps_stone")],
-        [InlineKeyboardButton(text="📄 کاغذ", callback_data="rps_paper")],
-        [InlineKeyboardButton(text="✂️ قیچی", callback_data="rps_scissors")]
-    ])
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🎲 تاس"), KeyboardButton(text="🎯 دارت")],
+            [KeyboardButton(text="🪨 سنگ‌کاغذ‌قیچی")],
+            [KeyboardButton(text="🔙 برگشت")]
+        ],
+        resize_keyboard=True
+    )
 
 def admin_menu():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📊 آمار کاربران", callback_data="stats")],
-        [InlineKeyboardButton(text="📤 آپلود فایل", callback_data="upload_file")],
-        [InlineKeyboardButton(text="🔙 برگشت", callback_data="back_main")]
-    ])
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📊 آمار کاربران")],
+            [KeyboardButton(text="📤 آپلود فایل")],
+            [KeyboardButton(text="🔙 برگشت")]
+        ],
+        resize_keyboard=True
+    )
 
 def channel_check_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -173,7 +177,6 @@ async def set_commands():
         BotCommand(command="stats", description="آمار ربات"),
         BotCommand(command="joke", description="جوک تصادفی"),
         BotCommand(command="quote", description="نقل قول انگیزشی"),
-        BotCommand(command="admin", description="پنل ادمین"),
     ]
     await bot.set_my_commands(commands)
 
@@ -221,7 +224,7 @@ async def start(message: types.Message):
 
     await message.answer(
         f"🚀 سلام {name}!\n"
-        "به ربات خوش آمدی.",
+        "به ربات خوش آمدی. از دکمه‌های زیر استفاده کن:",
         reply_markup=main_menu()
     )
 
@@ -235,19 +238,99 @@ async def check_join(callback: types.CallbackQuery):
     else:
         await callback.answer("❌ هنوز عضو کانال نشدی! اول عضو شو.", show_alert=True)
 
-# ======== دانلود یوتیوب ========
-@dp.callback_query(lambda c: c.data == "youtube")
-async def youtube(callback: types.CallbackQuery):
-    if not await is_member(callback.from_user.id):
-        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
-        return
-    await callback.message.answer("🎬 لینک ویدیو یوتیوب را بفرست:")
-    await callback.answer()
+# ======== دریافت شماره همراه ========
+@dp.message(lambda msg: msg.contact is not None)
+async def handle_contact(message: types.Message):
+    phone = message.contact.phone_number
+    user_id = message.from_user.id
+    await message.answer(
+        f"✅ شماره شما با موفقیت دریافت شد!\n"
+        f"📱 شماره: {phone}\n\n"
+        f"این شماره در ربات ذخیره شد.",
+        reply_markup=main_menu()
+    )
 
+# ======== دکمه‌های شیشه‌ای (Reply Keyboard) ========
+@dp.message(lambda msg: msg.text == "🎬 دانلود یوتیوب")
+async def youtube_button(message: types.Message):
+    if not await is_member(message.from_user.id):
+        await message.answer("❌ اول عضو کانال بشو!", reply_markup=channel_check_menu())
+        return
+    await message.answer("🎬 لینک ویدیو یوتیوب را بفرست:")
+
+@dp.message(lambda msg: msg.text == "🎮 بازی و سرگرمی")
+async def game_button(message: types.Message):
+    if not await is_member(message.from_user.id):
+        await message.answer("❌ اول عضو کانال بشو!", reply_markup=channel_check_menu())
+        return
+    await message.answer("🎮 یک بازی انتخاب کن:", reply_markup=game_menu())
+
+@dp.message(lambda msg: msg.text == "⚙️ پنل ادمین")
+async def admin_button(message: types.Message):
+    if not await is_admin(message.from_user.id):
+        await message.answer("⛔ شما دسترسی به پنل ادمین ندارید!")
+        return
+    await message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
+
+@dp.message(lambda msg: msg.text == "📤 آپلود فایل")
+async def upload_button(message: types.Message):
+    if not await is_admin(message.from_user.id):
+        await message.answer("⛔ فقط ادمین می‌تواند فایل آپلود کند!")
+        return
+    await message.answer("📤 لطفاً فایل (عکس، ویدئو، سند) را ارسال کنید.")
+
+@dp.message(lambda msg: msg.text == "❓ راهنما")
+async def help_button(message: types.Message):
+    await message.answer(
+        "📖 راهنمای ربات:\n\n"
+        "🎬 دانلود یوتیوب - لینک ویدیو رو بفرست\n"
+        "🎮 بازی و سرگرمی - بازی‌های مختلف\n"
+        "⚙️ پنل ادمین - مدیریت ربات\n"
+        "📤 آپلود فایل - آپلود فایل (فقط ادمین)\n"
+        "📞 ارسال شماره همراه - شماره خود را ارسال کن\n"
+        "❓ راهنما - این پیام"
+    )
+
+@dp.message(lambda msg: msg.text == "🔙 برگشت")
+async def back_button(message: types.Message):
+    await message.answer("🔙 منوی اصلی:", reply_markup=main_menu())
+
+@dp.message(lambda msg: msg.text == "🎲 تاس")
+async def dice_button(message: types.Message):
+    if not await is_member(message.from_user.id):
+        await message.answer("❌ اول عضو کانال بشو!", reply_markup=channel_check_menu())
+        return
+    await message.answer_dice(emoji="🎲")
+
+@dp.message(lambda msg: msg.text == "🎯 دارت")
+async def dart_button(message: types.Message):
+    if not await is_member(message.from_user.id):
+        await message.answer("❌ اول عضو کانال بشو!", reply_markup=channel_check_menu())
+        return
+    await message.answer_dice(emoji="🎯")
+
+@dp.message(lambda msg: msg.text == "🪨 سنگ‌کاغذ‌قیچی")
+async def rps_button(message: types.Message):
+    if not await is_member(message.from_user.id):
+        await message.answer("❌ اول عضو کانال بشو!", reply_markup=channel_check_menu())
+        return
+    choices = ["🪨 سنگ", "📄 کاغذ", "✂️ قیچی"]
+    bot_choice = random.choice(choices)
+    await message.answer(f"ربات انتخاب کرد: {bot_choice}")
+
+@dp.message(lambda msg: msg.text == "📊 آمار کاربران")
+async def stats_button(message: types.Message):
+    if not await is_admin(message.from_user.id):
+        await message.answer("⛔ فقط ادمین!")
+        return
+    count = users_col.count_documents({})
+    await message.answer(f"📊 تعداد کاربران ثبت‌شده: {count}")
+
+# ======== دانلود یوتیوب (دریافت لینک) ========
 @dp.message(lambda msg: msg.text and ("youtube.com" in msg.text or "youtu.be" in msg.text))
 async def get_youtube(message: types.Message):
     if not await is_member(message.from_user.id):
-        await message.answer("❌ اول عضو کانال بشو!")
+        await message.answer("❌ اول عضو کانال بشو!", reply_markup=channel_check_menu())
         return
     try:
         yt = YouTube(message.text)
@@ -259,101 +342,7 @@ async def get_youtube(message: types.Message):
     except:
         await message.answer("❌ خطا! لینک معتبر نیست.")
 
-# ======== بازی‌ها ========
-@dp.callback_query(lambda c: c.data == "game")
-async def game(callback: types.CallbackQuery):
-    if not await is_member(callback.from_user.id):
-        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
-        return
-    await callback.message.answer("🎮 یک بازی انتخاب کن:", reply_markup=game_menu())
-    await callback.answer()
-
-@dp.callback_query(lambda c: c.data == "dice")
-async def dice(callback: types.CallbackQuery):
-    if not await is_member(callback.from_user.id):
-        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
-        return
-    await callback.message.answer_dice(emoji="🎲")
-    await callback.answer()
-
-@dp.callback_query(lambda c: c.data == "dart")
-async def dart(callback: types.CallbackQuery):
-    if not await is_member(callback.from_user.id):
-        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
-        return
-    await callback.message.answer_dice(emoji="🎯")
-    await callback.answer()
-
-@dp.callback_query(lambda c: c.data == "rps")
-async def rps(callback: types.CallbackQuery):
-    if not await is_member(callback.from_user.id):
-        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
-        return
-    await callback.message.answer("🪨 یکی رو انتخاب کن:", reply_markup=rps_menu())
-    await callback.answer()
-
-@dp.callback_query(lambda c: c.data in ["rps_stone", "rps_paper", "rps_scissors"])
-async def rps_play(callback: types.CallbackQuery):
-    if not await is_member(callback.from_user.id):
-        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
-        return
-    choices = {
-        "rps_stone": {"name": "🪨 سنگ", "beats": "rps_scissors"},
-        "rps_paper": {"name": "📄 کاغذ", "beats": "rps_stone"},
-        "rps_scissors": {"name": "✂️ قیچی", "beats": "rps_paper"}
-    }
-    user_choice = callback.data
-    bot_choice = random.choice(list(choices.keys()))
-    user_emoji = choices[user_choice]["name"]
-    bot_emoji = choices[bot_choice]["name"]
-    if user_choice == bot_choice:
-        result = "🤝 مساوی!"
-    elif choices[user_choice]["beats"] == bot_choice:
-        result = "🎉 بردی!"
-    else:
-        result = "😢 باختی!"
-    await callback.message.answer(f"تو: {user_emoji}\nربات: {bot_emoji}\n\n{result}")
-    await callback.answer()
-
-@dp.callback_query(lambda c: c.data == "back_main")
-async def back_main(callback: types.CallbackQuery):
-    await callback.message.answer("🔙 منوی اصلی:", reply_markup=main_menu())
-    await callback.answer()
-
-# ======== پنل ادمین ========
-@dp.callback_query(lambda c: c.data == "admin_panel")
-async def admin_panel(callback: types.CallbackQuery):
-    if not await is_admin(callback.from_user.id):
-        await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
-        return
-    await callback.message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
-    await callback.answer()
-
-@dp.callback_query(lambda c: c.data == "stats")
-async def stats(callback: types.CallbackQuery):
-    if not await is_admin(callback.from_user.id):
-        await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
-        return
-    count = users_col.count_documents({})
-    await callback.message.answer(f"📊 تعداد کاربران ثبت‌شده: {count}")
-    await callback.answer()
-
 # ======== آپلود فایل ========
-@dp.callback_query(lambda c: c.data == "upload_file")
-async def upload_file_callback(callback: types.CallbackQuery):
-    if not await is_admin(callback.from_user.id):
-        await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
-        return
-    await callback.message.answer("📤 لطفاً فایل (عکس، ویدئو، سند) را ارسال کنید.\nبرای کپشن دلخواه، هنگام ارسال فایل، در قسمت کپشن بنویسید.")
-    await callback.answer()
-
-@dp.message(Command("upload"))
-async def upload_file_command(message: types.Message):
-    if not await is_admin(message.from_user.id):
-        await message.answer("⛔ فقط ادمین می‌تواند فایل آپلود کند!")
-        return
-    await message.answer("📤 لطفاً فایل (عکس، ویدئو، سند) را ارسال کنید.\nبرای کپشن دلخواه، هنگام ارسال فایل، در قسمت کپشن بنویسید.")
-
 @dp.message(lambda msg: msg.document or msg.photo or msg.video)
 async def handle_file_upload(message: types.Message):
     if not await is_admin(message.from_user.id):
@@ -389,8 +378,7 @@ async def handle_file_upload(message: types.Message):
     await message.answer(
         f"✅ فایل با موفقیت آپلود شد!\n\n"
         f"🔗 لینک اختصاصی:\n<code>{link}</code>\n\n"
-        f"📌 کپشن فایل:\n{caption}\n\n"
-        f"⚠️ کاربران ابتدا باید عضو کانال شوند تا فایل را دریافت کنند.",
+        f"📌 کپشن فایل:\n{caption}",
         parse_mode="HTML"
     )
 
@@ -408,8 +396,7 @@ async def help_command(message: types.Message):
         "/profile - پروفایل من\n"
         "/stats - آمار ربات\n"
         "/joke - جوک تصادفی\n"
-        "/quote - نقل قول انگیزشی\n"
-        "/admin - پنل ادمین"
+        "/quote - نقل قول انگیزشی"
     )
 
 @dp.message(Command("about"))
@@ -445,13 +432,6 @@ async def joke(message: types.Message):
 @dp.message(Command("quote"))
 async def quote(message: types.Message):
     await message.answer(f"💬 {random.choice(QUOTES)}")
-
-@dp.message(Command("admin"))
-async def admin_command(message: types.Message):
-    if not await is_admin(message.from_user.id):
-        await message.answer("⛔ شما دسترسی به پنل ادمین ندارید!")
-        return
-    await message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
 
 # ======== پاسخ به پیام‌های متنی ========
 @dp.message()
@@ -493,7 +473,7 @@ async def start_web():
 
 async def main():
     await start_web()
-    await set_commands()  # تنظیم دستورات در تلگرام
+    await set_commands()
     logging.info("🤖 Starting bot...")
     await dp.start_polling(bot, skip_updates=True)
 
