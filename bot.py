@@ -2,27 +2,59 @@ import asyncio
 import os
 import logging
 import random
-import json
 import aiohttp
 from datetime import datetime
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pymongo import MongoClient
 from aiohttp import web
+from pytube import YouTube
 
 TOKEN = os.getenv("BOT_TOKEN")
-if not TOKEN:
-    logging.error("❌ توکن تنظیم نشده!")
+MONGO_URI = os.getenv("MONGO_URI")
+
+if not TOKEN or not MONGO_URI:
+    logging.error("❌ متغیرهای محیطی تنظیم نشده‌اند!")
     exit(1)
+
+# ======== اتصال به دیتابیس ========
+client = MongoClient(MONGO_URI)
+db = client["telegram_bot"]
+users_col = db["users"]
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 logging.basicConfig(level=logging.INFO)
 
-ADMIN_ID = 466050034
-CHANNEL_LINK = "https://t.me/YourChannel"
+ADMIN_ID = int(os.getenv("ADMIN_ID", 466050034))
+CHANNEL_ID = int(os.getenv("CHANNEL_ID", -1001277492702))
 
-# ======== دیکشنری پاسخ‌های هوشمند ========
+# ======== توابع کمکی ========
+async def is_admin(user_id: int) -> bool:
+    return user_id == ADMIN_ID
+
+async def is_member(user_id: int) -> bool:
+    try:
+        member = await bot.get_chat_member(CHANNEL_ID, user_id)
+        return member.status in ["member", "administrator", "creator"]
+    except:
+        return False
+
+async def ask_ai(query: str) -> str:
+    try:
+        async with aiohttp.ClientSession() as session:
+            url = f"https://api.nexra.aryan.ir/v1/chat/gpt?text={query}"
+            async with session.get(url, timeout=10) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data.get("status") == "success" and data.get("data"):
+                        return data["data"].strip()
+        return None
+    except:
+        return None
+
+# ======== دیکشنری‌ها ========
 GREETINGS = {
     "سلام": "سلام! 👋",
     "خوبی": "خوبم ممنون! تو چطوری؟",
@@ -43,27 +75,9 @@ QUOTES = [
     "کد بزن و لذت ببر!"
 ]
 
-# ======== توابع ========
-async def is_admin(user_id: int) -> bool:
-    return user_id == ADMIN_ID
-
-async def ask_ai(query: str) -> str:
-    try:
-        async with aiohttp.ClientSession() as session:
-            url = f"https://api.nexra.aryan.ir/v1/chat/gpt?text={query}"
-            async with session.get(url, timeout=10) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    if data.get("status") == "success" and data.get("data"):
-                        return data["data"].strip()
-        return None
-    except:
-        return None
-
 # ======== منوها ========
 def main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📥 دانلود اینستاگرام", callback_data="insta")],
         [InlineKeyboardButton(text="🎬 دانلود یوتیوب", callback_data="youtube")],
         [InlineKeyboardButton(text="🎮 بازی و سرگرمی", callback_data="game")],
         [InlineKeyboardButton(text="⚙️ پنل ادمین", callback_data="admin_panel")]
@@ -86,26 +100,52 @@ def rps_menu():
 
 def admin_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📊 آمار", callback_data="stats")],
+        [InlineKeyboardButton(text="📊 آمار کاربران", callback_data="stats")],
         [InlineKeyboardButton(text="🔙 برگشت", callback_data="back_main")]
+    ])
+
+def channel_check_menu():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📢 عضویت در کانال", url=f"https://t.me/YourChannel")],
+        [InlineKeyboardButton(text="✅ عضویت داشتم", callback_data="check_join")]
     ])
 
 # ======== دستور /start ========
 @dp.message(Command("start"))
 async def start(message: types.Message):
+    user_id = message.from_user.id
+    name = message.from_user.first_name
+
+    # ذخیره کاربر در دیتابیس
+    if not users_col.find_one({"_id": user_id}):
+        users_col.insert_one({"_id": user_id, "name": name})
+
+    # بررسی عضویت در کانال
+    if not await is_member(user_id):
+        await message.answer(
+            f"👋 سلام {name}!\n"
+            "برای استفاده از ربات، لطفاً اول عضو کانال ما بشو:",
+            reply_markup=channel_check_menu()
+        )
+        return
+
     await message.answer(
-        f"🚀 سلام {message.from_user.first_name}!\n"
-        "به ربات خوش آمدی. (نسخه سبک)",
+        f"🚀 سلام {name}!\n"
+        "به ربات خوش آمدی.",
         reply_markup=main_menu()
     )
 
-# ======== دانلود اینستاگرام (غیرفعال) ========
-@dp.callback_query(lambda c: c.data == "insta")
-async def insta(callback: types.CallbackQuery):
-    await callback.message.answer("❌ دانلود اینستاگرام فعلاً غیرفعال است.")
-    await callback.answer()
+# ======== بررسی مجدد عضویت ========
+@dp.callback_query(lambda c: c.data == "check_join")
+async def check_join(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    if await is_member(user_id):
+        await callback.message.edit_text("✅ ممنون! حالا می‌تونی از ربات استفاده کنی.")
+        await callback.message.answer("🚀 منوی اصلی:", reply_markup=main_menu())
+    else:
+        await callback.answer("❌ هنوز عضو کانال نشدی! اول عضو شو.", show_alert=True)
 
-# ======== دانلود یوتیوب (با pytube) ========
+# ======== دانلود یوتیوب ========
 @dp.callback_query(lambda c: c.data == "youtube")
 async def youtube(callback: types.CallbackQuery):
     await callback.message.answer("🎬 لینک ویدیو یوتیوب را بفرست:")
@@ -114,7 +154,6 @@ async def youtube(callback: types.CallbackQuery):
 @dp.message(lambda msg: msg.text and ("youtube.com" in msg.text or "youtu.be" in msg.text))
 async def get_youtube(message: types.Message):
     try:
-        from pytube import YouTube
         yt = YouTube(message.text)
         stream = yt.streams.get_highest_resolution()
         if stream:
@@ -184,7 +223,8 @@ async def stats(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
-    await callback.message.answer("📊 آمار ربات: نسخه سبک")
+    count = users_col.count_documents({})
+    await callback.message.answer(f"📊 تعداد کاربران ثبت‌شده: {count}")
     await callback.answer()
 
 # ======== پاسخ به پیام‌های متنی ========
