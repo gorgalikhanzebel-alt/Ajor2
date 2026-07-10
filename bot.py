@@ -11,6 +11,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermis
 from pymongo import MongoClient
 from aiohttp import web
 from pytube import YouTube
+import traceback
 
 TOKEN = os.getenv("BOT_TOKEN")
 MONGO_URI = os.getenv("MONGO_URI")
@@ -36,7 +37,7 @@ DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
 
 OPENROUTER_API_KEY = "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"
 
-# ======== دیکشنری‌ها ========
+# ======== دیکشنری‌های سبک ========
 GREETINGS = {"سلام": "سلام! 👋", "خوبی": "خوبم ممنون!", "چطوری": "خوبم!", "مرسی": "خواهش!", "خداحافظ": "خداحافظ! 👋", "صبح بخیر": "صبح بخیر! ☀️", "شب بخیر": "شب بخیر! 🌙", "خوش اومدی": "خوش اومدی! ✨", "درود": "درود! 🌹"}
 JOKES = ["چرا مرغ از جاده رد شد؟ 😂", "پایتون بهترین زبان! 🐍", "پنگوئن گفت چقدر خنک! 😄", "ریاضیات غمگینه؟ بی‌جوابه!", "نارگیل تو رودخونه آب میشه!", "یه گربه گفت منوس! 😹"]
 QUOTES = ["به فکر فردا باش!", "بلند شدن دوباره!", "کد بزن لذت ببر!", "زندگی مثل شکلاته!", "بهترین زمان الان است!", "با امید تلاش کن! 🏔️"]
@@ -51,8 +52,7 @@ async def is_member(user_id):
     try:
         member = await bot.get_chat_member(CHANNEL_ID, user_id)
         return member.status in ["member", "administrator", "creator"]
-    except:
-        return False
+    except: return False
 
 async def ask_ai(query):
     try:
@@ -79,7 +79,7 @@ async def ask_ai(query):
 def get_tehran_time():
     return datetime.now(timezone.utc) + timedelta(hours=3, minutes=30)
 
-# ======== منوهای شیشه‌ای ========
+# ======== منوهای شیشه‌ای (ساده‌شده برای تست) ========
 def main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton("🎬 یوتیوب", callback_data="youtube")],
@@ -140,7 +140,7 @@ def channel_check_menu():
     ])
 
 # ============================================
-# ======== START (ساده و بی‌خطا) ========
+# ======== START (با لاگ خطا) ========
 # ============================================
 @dp.message(Command("start"))
 async def start(message: types.Message):
@@ -148,9 +148,31 @@ async def start(message: types.Message):
         user_id = message.from_user.id
         name = message.from_user.first_name
         
+        # بررسی مسدودیت
+        if await is_banned(user_id):
+            return await message.answer("🚫 مسدود هستید!")
+        
+        # بررسی لینک فایل
+        if message.text and message.text.startswith("/start file_"):
+            file_uuid = message.text.split("_")[1]
+            file_data = files_col.find_one({"uuid": file_uuid})
+            if file_data:
+                if not await is_member(user_id):
+                    return await message.answer(f"👋 {name}!\nبرای دریافت فایل، عضو کانال بشو:", reply_markup=channel_check_menu())
+                file_id, file_type, caption = file_data["file_id"], file_data["type"], file_data.get("caption", DEFAULT_CAPTION)
+                if file_type == "photo": await message.answer_photo(file_id, caption=caption)
+                elif file_type == "video": await message.answer_video(file_id, caption=caption)
+                else: await message.answer_document(file_id, caption=caption)
+                return
+            return await message.answer("❌ فایل یافت نشد.")
+        
         # ثبت کاربر
         if not users_col.find_one({"_id": user_id}):
             users_col.insert_one({"_id": user_id, "name": name, "joined_at": datetime.now()})
+        
+        # بررسی عضویت در کانال
+        if not await is_member(user_id):
+            return await message.answer(f"👋 {name}!\nبرای استفاده، عضو کانال بشو:", reply_markup=channel_check_menu())
         
         # نمایش منوی اصلی
         await message.answer(
@@ -158,11 +180,11 @@ async def start(message: types.Message):
             reply_markup=main_menu()
         )
     except Exception as e:
-        logging.error(f"Error in start: {e}")
+        logging.error(f"❌ خطا در start: {e}\n{traceback.format_exc()}")
         await message.answer("❌ خطایی رخ داد! لطفاً دوباره تلاش کن.")
 
 # ============================================
-# ======== بررسی عضویت ========
+# ======== بقیه کدها (بدون تغییر) ========
 # ============================================
 @dp.callback_query(lambda c: c.data == "check_join")
 async def check_join(callback: types.CallbackQuery):
@@ -174,9 +196,6 @@ async def check_join(callback: types.CallbackQuery):
     else:
         await callback.answer("❌ عضو نشدی!", show_alert=True)
 
-# ============================================
-# ======== یوتیوب ========
-# ============================================
 @dp.callback_query(lambda c: c.data == "youtube")
 async def youtube(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id) or not await is_member(callback.from_user.id):
@@ -198,9 +217,6 @@ async def get_youtube(message: types.Message):
     except:
         await message.answer("❌ لینک نامعتبر!")
 
-# ============================================
-# ======== منو اصلی ========
-# ============================================
 @dp.callback_query(lambda c: c.data in ["wallet", "charge", "support", "profile_user"])
 async def menu_items(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id):
@@ -214,9 +230,6 @@ async def menu_items(callback: types.CallbackQuery):
     await callback.message.answer(data[callback.data])
     await callback.answer()
 
-# ============================================
-# ======== بازی‌ها ========
-# ============================================
 @dp.callback_query(lambda c: c.data == "game")
 async def game(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id) or not await is_member(callback.from_user.id):
