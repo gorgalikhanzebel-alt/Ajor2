@@ -3,6 +3,7 @@ import os
 import logging
 import random
 import aiohttp
+import uuid
 from datetime import datetime
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -21,6 +22,7 @@ if not TOKEN or not MONGO_URI:
 client = MongoClient(MONGO_URI)
 db = client["telegram_bot"]
 users_col = db["users"]
+files_col = db["files"]
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -28,6 +30,9 @@ logging.basicConfig(level=logging.INFO)
 
 ADMIN_ID = int(os.getenv("ADMIN_ID", 466050034))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", -1001277492702))
+
+# ======== کپشن پیش‌فرض برای فایل‌ها ========
+DEFAULT_CAPTION = "📌 عضویت در کانال ما: @Ajor_pareh"
 
 # ======== توابع کمکی ========
 async def is_admin(user_id: int) -> bool:
@@ -104,6 +109,7 @@ def rps_menu():
 def admin_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📊 آمار کاربران", callback_data="stats")],
+        [InlineKeyboardButton(text="📤 آپلود فایل", callback_data="upload_file")],
         [InlineKeyboardButton(text="🔙 برگشت", callback_data="back_main")]
     ])
 
@@ -119,9 +125,39 @@ async def start(message: types.Message):
     user_id = message.from_user.id
     name = message.from_user.first_name
 
+    # بررسی لینک اختصاصی فایل
+    if message.text and message.text.startswith("/start file_"):
+        file_uuid = message.text.split("_")[1]
+        file_data = files_col.find_one({"uuid": file_uuid})
+        if file_data:
+            if not await is_member(user_id):
+                await message.answer(
+                    f"👋 سلام {name}!\n"
+                    "برای دریافت این فایل، لطفاً اول عضو کانال ما بشو:",
+                    reply_markup=channel_check_menu()
+                )
+                return
+            
+            file_id = file_data["file_id"]
+            file_type = file_data["type"]
+            caption = file_data.get("caption", DEFAULT_CAPTION)
+            
+            if file_type == "photo":
+                await message.answer_photo(file_id, caption=caption)
+            elif file_type == "video":
+                await message.answer_video(file_id, caption=caption)
+            else:
+                await message.answer_document(file_id, caption=caption)
+            
+            # حذف فایل از دیتابیس (یکبار مصرف)
+            # files_col.delete_one({"uuid": file_uuid})
+            return
+
+    # ذخیره کاربر
     if not users_col.find_one({"_id": user_id}):
         users_col.insert_one({"_id": user_id, "name": name})
 
+    # بررسی عضویت در کانال
     if not await is_member(user_id):
         await message.answer(
             f"👋 سلام {name}!\n"
@@ -227,6 +263,66 @@ async def stats(callback: types.CallbackQuery):
     count = users_col.count_documents({})
     await callback.message.answer(f"📊 تعداد کاربران ثبت‌شده: {count}")
     await callback.answer()
+
+# ======== آپلود فایل (فقط ادمین) ========
+@dp.callback_query(lambda c: c.data == "upload_file")
+async def upload_file(callback: types.CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+        return
+    await callback.message.answer("📤 لطفاً فایل (عکس، ویدئو، سند) را ارسال کنید.\nبرای کپشن دلخواه، هنگام ارسال فایل، در قسمت کپشن بنویسید.")
+    await callback.answer()
+
+@dp.message(lambda msg: msg.document or msg.photo or msg.video)
+async def handle_file_upload(message: types.Message):
+    if not await is_admin(message.from_user.id):
+        await message.answer("⛔ فقط ادمین می‌تواند فایل آپلود کند!")
+        return
+
+    # دریافت اطلاعات فایل
+    if message.document:
+        file_id = message.document.file_id
+        file_type = "document"
+        file_name = message.document.file_name
+    elif message.photo:
+        file_id = message.photo[-1].file_id
+        file_type = "photo"
+        file_name = "عکس"
+    elif message.video:
+        file_id = message.video.file_id
+        file_type = "video"
+        file_name = "ویدئو"
+    else:
+        await message.answer("❌ نوع فایل پشتیبانی نمی‌شود.")
+        return
+
+    # تولید UUID یکتا
+    file_uuid = str(uuid.uuid4())[:8]
+
+    # کپشن: اگر کاربر کپشن داده بود، ازش استفاده کن، در غیر این صورت کپشن پیش‌فرض
+    caption = message.caption if message.caption else DEFAULT_CAPTION
+
+    # ذخیره در دیتابیس
+    files_col.insert_one({
+        "uuid": file_uuid,
+        "file_id": file_id,
+        "type": file_type,
+        "name": file_name,
+        "caption": caption,
+        "uploaded_at": datetime.now()
+    })
+
+    # ساخت لینک اختصاصی
+    bot_info = await bot.get_me()
+    link = f"https://t.me/{bot_info.username}?start=file_{file_uuid}"
+
+    await message.answer(
+        f"✅ فایل با موفقیت آپلود شد!\n\n"
+        f"🔗 لینک اختصاصی:\n<code>{link}</code>\n\n"
+        f"📌 کپشن فایل:\n{caption}\n\n"
+        f"⚠️ کاربران ابتدا باید عضو کانال شوند تا فایل را دریافت کنند.",
+        parse_mode="HTML"
+    )
 
 # ======== دستورات کامل ========
 @dp.message(Command("help"))
