@@ -30,8 +30,7 @@ logging.basicConfig(level=logging.INFO)
 
 ADMIN_ID = int(os.getenv("ADMIN_ID", 466050034))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", -1001277492702))
-CHANNEL_LINK = "https://t.me/ajor_pareh"  # ✅ لینک واقعی کانال شما
-
+CHANNEL_LINK = "https://t.me/ajor_pareh"
 DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
 
 # ======== توابع کمکی ========
@@ -119,12 +118,13 @@ def channel_check_menu():
         [InlineKeyboardButton(text="✅ عضویت داشتم", callback_data="check_join")]
     ])
 
-# ======== دستور /start ========
+# ======== دستور /start با اصلاح ========
 @dp.message(Command("start"))
 async def start(message: types.Message):
     user_id = message.from_user.id
     name = message.from_user.first_name
 
+    # بررسی لینک اختصاصی فایل
     if message.text and message.text.startswith("/start file_"):
         file_uuid = message.text.split("_")[1]
         file_data = files_col.find_one({"uuid": file_uuid})
@@ -147,10 +147,12 @@ async def start(message: types.Message):
                 await message.answer_video(file_id, caption=caption)
             else:
                 await message.answer_document(file_id, caption=caption)
-            
-            # files_col.delete_one({"uuid": file_uuid})
+            return
+        else:
+            await message.answer("❌ فایل مورد نظر یافت نشد. ممکن است منقضی شده باشد.")
             return
 
+    # ادامه کد عادی /start
     if not users_col.find_one({"_id": user_id}):
         users_col.insert_one({"_id": user_id, "name": name})
 
@@ -321,7 +323,7 @@ async def handle_file_upload(message: types.Message):
         parse_mode="HTML"
     )
 
-# ======== دستورات کامل ========
+# ======== دستورات ========
 @dp.message(Command("help"))
 async def help_command(message: types.Message):
     await message.answer(
