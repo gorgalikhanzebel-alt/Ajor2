@@ -36,7 +36,7 @@ DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
 
 OPENROUTER_API_KEY = "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"
 
-# ======== جملات خنده‌دار و ... ========
+# ======== جملات خنده‌دار ========
 FUNNY_FALLBACKS = [
     "چی میگی بچه خوشگل؟ 😏",
     "سیک تو بزن تا سیکمو نزدن 😂",
@@ -157,6 +157,7 @@ def get_tehran_time():
 # ======== منوها ========
 def main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📋 لیست دستورات", callback_data="show_commands")],  # <-- دکمه جدید
         [InlineKeyboardButton(text="🎬 دانلود یوتیوب", callback_data="youtube")],
         [InlineKeyboardButton(text="🎮 بازی و سرگرمی", callback_data="game")],
         [InlineKeyboardButton(text="💳 کیف پول", callback_data="wallet"),
@@ -239,7 +240,6 @@ async def start(message: types.Message):
     user_id = message.from_user.id
     name = message.from_user.first_name
 
-    # اگر کاربر از لینک گروه آمده باشد
     if message.text and message.text.startswith("/start group_"):
         group_uuid = message.text.split("_")[1]
         if not await is_member(user_id):
@@ -252,7 +252,6 @@ async def start(message: types.Message):
         await send_group_files(message, group_uuid)
         return
 
-    # لینک اختصاصی فایل (قدیمی)
     if message.text and message.text.startswith("/start file_"):
         file_uuid = message.text.split("_")[1]
         file_data = files_col.find_one({"uuid": file_uuid})
@@ -278,7 +277,6 @@ async def start(message: types.Message):
             await message.answer("❌ فایل مورد نظر یافت نشد.")
             return
 
-    # ثبت کاربر جدید
     if not users_col.find_one({"_id": user_id}):
         users_col.insert_one({"_id": user_id, "name": name})
 
@@ -295,6 +293,57 @@ async def start(message: types.Message):
         "به ربات خوش آمدی. از دکمه‌های زیر استفاده کن:",
         reply_markup=main_menu()
     )
+
+# ======== دستور /menu ========
+@dp.message(Command("menu"))
+async def menu_command(message: types.Message):
+    await message.answer(
+        "📋 **لیست تمام دستورات:**\n\n"
+        "/start - شروع و منوی اصلی\n"
+        "/menu - نمایش همین لیست\n"
+        "/help - راهنما\n"
+        "/profile - پروفایل شما\n"
+        "/time - زمان و تاریخ تهران\n"
+        "/id - نمایش آیدی عددی\n"
+        "/joke - جوک تصادفی\n"
+        "/quote - نقل قول انگیزشی\n"
+        "/ping - وضعیت ربات\n"
+        "/admin - پنل ادمین\n"
+        "/cancel - لغو بازی حدس عدد\n"
+        "/publishgroup - انتشار گروه (فقط ادمین)\n\n"
+        "⚙️ دستورات مدیریت گروه:\n"
+        "/lock - قفل گروه\n"
+        "/unlock - باز کردن گروه\n"
+        "/ban [آیدی] - بن کاربر\n"
+        "/unban [آیدی] - رفع بن\n"
+        "/clear [تعداد] - پاک کردن پیام‌ها"
+    )
+
+# ======== کالبک دکمه لیست دستورات ========
+@dp.callback_query(lambda c: c.data == "show_commands")
+async def show_commands_callback(callback: types.CallbackQuery):
+    await callback.message.answer(
+        "📋 **لیست تمام دستورات:**\n\n"
+        "/start - شروع و منوی اصلی\n"
+        "/menu - نمایش همین لیست\n"
+        "/help - راهنما\n"
+        "/profile - پروفایل شما\n"
+        "/time - زمان و تاریخ تهران\n"
+        "/id - نمایش آیدی عددی\n"
+        "/joke - جوک تصادفی\n"
+        "/quote - نقل قول انگیزشی\n"
+        "/ping - وضعیت ربات\n"
+        "/admin - پنل ادمین\n"
+        "/cancel - لغو بازی حدس عدد\n"
+        "/publishgroup - انتشار گروه (فقط ادمین)\n\n"
+        "⚙️ دستورات مدیریت گروه:\n"
+        "/lock - قفل گروه\n"
+        "/unlock - باز کردن گروه\n"
+        "/ban [آیدی] - بن کاربر\n"
+        "/unban [آیدی] - رفع بن\n"
+        "/clear [تعداد] - پاک کردن پیام‌ها"
+    )
+    await callback.answer()
 
 # ======== بررسی مجدد عضویت ========
 @dp.callback_query(lambda c: c.data == "check_join")
@@ -728,6 +777,7 @@ async def help_command(message: types.Message):
     await message.answer(
         "📖 لیست دستورات:\n"
         "/start - شروع و منوی اصلی\n"
+        "/menu - نمایش لیست همه دستورات\n"
         "/help - نمایش راهنما\n"
         "/profile - پروفایل شما\n"
         "/time - ساعت و تاریخ (تهران)\n"
@@ -737,7 +787,7 @@ async def help_command(message: types.Message):
         "/ping - بررسی وضعیت ربات\n"
         "/admin - پنل ادمین\n"
         "/cancel - لغو بازی حدس عدد\n"
-        "/publishgroup - انتشار گروه فعلی (اختیاری، می‌توانید از دکمه استفاده کنید)\n"
+        "/publishgroup - انتشار گروه فعلی (فقط ادمین)\n"
         "\n⚙️ دستورات مدیریت گروه:\n"
         "/lock - قفل گروه\n"
         "/unlock - باز کردن گروه\n"
@@ -907,16 +957,17 @@ async def main():
     # ======== ثبت دستورات در منوی ربات ========
     commands = [
         BotCommand(command="start", description="🚀 شروع و منوی اصلی"),
+        BotCommand(command="menu", description="📋 لیست تمام دستورات"),
         BotCommand(command="help", description="📖 راهنما"),
         BotCommand(command="profile", description="👤 پروفایل شما"),
         BotCommand(command="time", description="🕒 زمان و تاریخ تهران"),
-        BotCommand(command="id", description="🆔 نمایش آیدی عددی شما"),
+        BotCommand(command="id", description="🆔 نمایش آیدی عددی"),
         BotCommand(command="joke", description="😂 جوک تصادفی"),
         BotCommand(command="quote", description="💬 نقل قول انگیزشی"),
-        BotCommand(command="ping", description="✅ بررسی وضعیت ربات"),
+        BotCommand(command="ping", description="✅ وضعیت ربات"),
         BotCommand(command="admin", description="⚙️ پنل ادمین"),
         BotCommand(command="cancel", description="❌ لغو بازی حدس عدد"),
-        BotCommand(command="publishgroup", description="📤 انتشار گروه و دریافت لینک (ادمین)"),
+        BotCommand(command="publishgroup", description="📤 انتشار گروه (ادمین)"),
     ]
     await bot.set_my_commands(commands)
     logging.info("✅ دستورات با موفقیت در منوی ربات ثبت شدند.")
