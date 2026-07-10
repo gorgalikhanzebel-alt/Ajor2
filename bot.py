@@ -29,14 +29,13 @@ dp = Dispatcher()
 logging.basicConfig(level=logging.INFO)
 
 ADMIN_ID = int(os.getenv("ADMIN_ID", 466050034))
-CHANNEL_ID = int(os.getenv("CHANNEL_ID", -1001277492702))
+CHANNEL_ID = -1001277492702  # آیدی عددی کانال @ajor_pareh
 CHANNEL_LINK = "https://t.me/ajor_pareh"
 DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
 
-# ======== کلید هوش مصنوعی ========
 OPENROUTER_API_KEY = "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"
 
-# ======== جملات جدید برای زمانی که هوش مصنوعی جواب نده ========
+# ======== جملات خنده‌دار ========
 FUNNY_FALLBACKS = [
     "چی میگی بچه خوشگل؟ 😏",
     "سیک تو بزن تا سیکمو نزدن 😂",
@@ -50,14 +49,15 @@ async def is_admin(user_id: int) -> bool:
     return user_id == ADMIN_ID
 
 async def is_member(user_id: int) -> bool:
+    """بررسی عضویت کاربر در کانال"""
     try:
         member = await bot.get_chat_member(CHANNEL_ID, user_id)
         return member.status in ["member", "administrator", "creator"]
-    except:
+    except Exception as e:
+        logging.error(f"Error checking membership: {e}")
         return False
 
 async def ask_ai_openrouter(query: str) -> str:
-    """پرسش از OpenRouter (رایگان و سبک)"""
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -69,20 +69,17 @@ async def ask_ai_openrouter(query: str) -> str:
         "max_tokens": 500,
         "temperature": 0.7,
     }
-
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, json=data, timeout=15) as resp:
                 if resp.status == 200:
                     result = await resp.json()
                     return result['choices'][0]['message']['content']
-                else:
-                    return None
+                return None
     except Exception:
         return None
 
 async def ask_ai_nexra(query: str) -> str:
-    """پرسش از nexra.aryan.ir (روش قبلی)"""
     try:
         async with aiohttp.ClientSession() as session:
             url = f"https://api.nexra.aryan.ir/v1/chat/gpt?text={query}"
@@ -92,19 +89,16 @@ async def ask_ai_nexra(query: str) -> str:
                     if data.get("status") == "success" and data.get("data"):
                         return data["data"].strip()
         return None
-    except:
+    except Exception:
         return None
 
 async def ask_ai(query: str) -> str:
-    """ترکیبی از دو روش: اول OpenRouter، بعد nexra"""
     result = await ask_ai_openrouter(query)
     if result:
         return result
-
     result = await ask_ai_nexra(query)
     if result:
         return result
-
     return None
 
 # ======== دیکشنری‌ها ========
@@ -168,12 +162,13 @@ def channel_check_menu():
         [InlineKeyboardButton(text="✅ عضویت داشتم", callback_data="check_join")]
     ])
 
-# ======== دستور /start ========
+# ======== دستور /start با ممبرگیر قوی ========
 @dp.message(Command("start"))
 async def start(message: types.Message):
     user_id = message.from_user.id
     name = message.from_user.first_name
 
+    # بررسی لینک اختصاصی فایل
     if message.text and message.text.startswith("/start file_"):
         file_uuid = message.text.split("_")[1]
         file_data = files_col.find_one({"uuid": file_uuid})
@@ -201,9 +196,11 @@ async def start(message: types.Message):
             await message.answer("❌ فایل مورد نظر یافت نشد. ممکن است منقضی شده باشد.")
             return
 
+    # ذخیره کاربر در دیتابیس
     if not users_col.find_one({"_id": user_id}):
         users_col.insert_one({"_id": user_id, "name": name})
 
+    # بررسی عضویت در کانال (ممبرگیر)
     if not await is_member(user_id):
         await message.answer(
             f"👋 سلام {name}!\n"
@@ -231,11 +228,17 @@ async def check_join(callback: types.CallbackQuery):
 # ======== دانلود یوتیوب ========
 @dp.callback_query(lambda c: c.data == "youtube")
 async def youtube(callback: types.CallbackQuery):
+    if not await is_member(callback.from_user.id):
+        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
+        return
     await callback.message.answer("🎬 لینک ویدیو یوتیوب را بفرست:")
     await callback.answer()
 
 @dp.message(lambda msg: msg.text and ("youtube.com" in msg.text or "youtu.be" in msg.text))
 async def get_youtube(message: types.Message):
+    if not await is_member(message.from_user.id):
+        await message.answer("❌ اول عضو کانال بشو!")
+        return
     try:
         yt = YouTube(message.text)
         stream = yt.streams.get_highest_resolution()
@@ -249,26 +252,41 @@ async def get_youtube(message: types.Message):
 # ======== بازی‌ها ========
 @dp.callback_query(lambda c: c.data == "game")
 async def game(callback: types.CallbackQuery):
+    if not await is_member(callback.from_user.id):
+        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
+        return
     await callback.message.answer("🎮 یک بازی انتخاب کن:", reply_markup=game_menu())
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data == "dice")
 async def dice(callback: types.CallbackQuery):
+    if not await is_member(callback.from_user.id):
+        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
+        return
     await callback.message.answer_dice(emoji="🎲")
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data == "dart")
 async def dart(callback: types.CallbackQuery):
+    if not await is_member(callback.from_user.id):
+        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
+        return
     await callback.message.answer_dice(emoji="🎯")
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data == "rps")
 async def rps(callback: types.CallbackQuery):
+    if not await is_member(callback.from_user.id):
+        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
+        return
     await callback.message.answer("🪨 یکی رو انتخاب کن:", reply_markup=rps_menu())
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data in ["rps_stone", "rps_paper", "rps_scissors"])
 async def rps_play(callback: types.CallbackQuery):
+    if not await is_member(callback.from_user.id):
+        await callback.answer("❌ اول عضو کانال بشو!", show_alert=True)
+        return
     choices = {
         "rps_stone": {"name": "🪨 سنگ", "beats": "rps_scissors"},
         "rps_paper": {"name": "📄 کاغذ", "beats": "rps_stone"},
@@ -415,10 +433,21 @@ async def admin_command(message: types.Message):
         return
     await message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
 
-# ======== پاسخ به پیام‌های متنی (با دو روش هوش مصنوعی) ========
+# ======== پاسخ به پیام‌های متنی ========
 @dp.message()
 async def handle_text(message: types.Message):
     if message.chat.type != "private":
+        return
+
+    user_id = message.from_user.id
+
+    # اول بررسی کن که کاربر عضو کانال هست یا نه
+    if not await is_member(user_id):
+        await message.answer(
+            "❌ شما عضو کانال ما نیستی!\n"
+            "لطفاً اول عضو کانال بشو تا بتوانی از ربات استفاده کنی.",
+            reply_markup=channel_check_menu()
+        )
         return
 
     text = message.text.strip().lower()
@@ -429,13 +458,13 @@ async def handle_text(message: types.Message):
             await message.answer(response)
             return
 
-    # هوش مصنوعی (ترکیبی از دو روش)
+    # هوش مصنوعی
     ai_response = await ask_ai(text)
     if ai_response:
         await message.answer(ai_response)
         return
 
-    # اگر هیچکدوم جواب نداد، از جملات خنده‌دار استفاده کن
+    # جملات خنده‌دار
     await message.answer(random.choice(FUNNY_FALLBACKS))
 
 # ======== پورت ========
