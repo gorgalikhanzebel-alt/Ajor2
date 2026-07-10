@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions, BotCommand
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions
 from pymongo import MongoClient
 from aiohttp import web
 from pytube import YouTube
@@ -157,7 +157,7 @@ def get_tehran_time():
 # ======== منوها ========
 def main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📋 لیست دستورات", callback_data="show_commands")],  # <-- دکمه جدید
+        [InlineKeyboardButton(text="📋 لیست دستورات", callback_data="show_commands")],
         [InlineKeyboardButton(text="🎬 دانلود یوتیوب", callback_data="youtube")],
         [InlineKeyboardButton(text="🎮 بازی و سرگرمی", callback_data="game")],
         [InlineKeyboardButton(text="💳 کیف پول", callback_data="wallet"),
@@ -294,54 +294,30 @@ async def start(message: types.Message):
         reply_markup=main_menu()
     )
 
-# ======== دستور /menu ========
-@dp.message(Command("menu"))
-async def menu_command(message: types.Message):
-    await message.answer(
-        "📋 **لیست تمام دستورات:**\n\n"
-        "/start - شروع و منوی اصلی\n"
-        "/menu - نمایش همین لیست\n"
-        "/help - راهنما\n"
-        "/profile - پروفایل شما\n"
-        "/time - زمان و تاریخ تهران\n"
-        "/id - نمایش آیدی عددی\n"
-        "/joke - جوک تصادفی\n"
-        "/quote - نقل قول انگیزشی\n"
-        "/ping - وضعیت ربات\n"
-        "/admin - پنل ادمین\n"
-        "/cancel - لغو بازی حدس عدد\n"
-        "/publishgroup - انتشار گروه (فقط ادمین)\n\n"
-        "⚙️ دستورات مدیریت گروه:\n"
-        "/lock - قفل گروه\n"
-        "/unlock - باز کردن گروه\n"
-        "/ban [آیدی] - بن کاربر\n"
-        "/unban [آیدی] - رفع بن\n"
-        "/clear [تعداد] - پاک کردن پیام‌ها"
-    )
-
 # ======== کالبک دکمه لیست دستورات ========
 @dp.callback_query(lambda c: c.data == "show_commands")
 async def show_commands_callback(callback: types.CallbackQuery):
     await callback.message.answer(
-        "📋 **لیست تمام دستورات:**\n\n"
-        "/start - شروع و منوی اصلی\n"
-        "/menu - نمایش همین لیست\n"
-        "/help - راهنما\n"
-        "/profile - پروفایل شما\n"
-        "/time - زمان و تاریخ تهران\n"
-        "/id - نمایش آیدی عددی\n"
-        "/joke - جوک تصادفی\n"
-        "/quote - نقل قول انگیزشی\n"
-        "/ping - وضعیت ربات\n"
-        "/admin - پنل ادمین\n"
-        "/cancel - لغو بازی حدس عدد\n"
-        "/publishgroup - انتشار گروه (فقط ادمین)\n\n"
+        "📋 **لیست دستورات قابل استفاده (با تایپ کردن):**\n\n"
+        "🔹 /start - شروع و منوی اصلی\n"
+        "🔹 /menu - نمایش همین لیست\n"
+        "🔹 /help - راهنما\n"
+        "🔹 /profile - پروفایل شما\n"
+        "🔹 /time - زمان و تاریخ تهران\n"
+        "🔹 /id - نمایش آیدی عددی\n"
+        "🔹 /joke - جوک تصادفی\n"
+        "🔹 /quote - نقل قول انگیزشی\n"
+        "🔹 /ping - وضعیت ربات\n"
+        "🔹 /admin - پنل ادمین\n"
+        "🔹 /cancel - لغو بازی حدس عدد\n"
+        "🔹 /publishgroup - انتشار گروه (فقط ادمین)\n\n"
         "⚙️ دستورات مدیریت گروه:\n"
-        "/lock - قفل گروه\n"
-        "/unlock - باز کردن گروه\n"
-        "/ban [آیدی] - بن کاربر\n"
-        "/unban [آیدی] - رفع بن\n"
-        "/clear [تعداد] - پاک کردن پیام‌ها"
+        "🔸 /lock - قفل گروه\n"
+        "🔸 /unlock - باز کردن گروه\n"
+        "🔸 /ban [آیدی] - بن کاربر\n"
+        "🔸 /unban [آیدی] - رفع بن\n"
+        "🔸 /clear [تعداد] - پاک کردن پیام‌ها\n\n"
+        "💡 همه این دستورات رو می‌تونی تایپ کنی و استفاده کنی."
     )
     await callback.answer()
 
@@ -777,7 +753,6 @@ async def help_command(message: types.Message):
     await message.answer(
         "📖 لیست دستورات:\n"
         "/start - شروع و منوی اصلی\n"
-        "/menu - نمایش لیست همه دستورات\n"
         "/help - نمایش راهنما\n"
         "/profile - پروفایل شما\n"
         "/time - ساعت و تاریخ (تهران)\n"
@@ -954,26 +929,8 @@ async def start_web():
     logging.info(f"✅ Web server started on port {port}")
 
 async def main():
-    # ======== ثبت دستورات در منوی ربات ========
-    commands = [
-        BotCommand(command="start", description="🚀 شروع و منوی اصلی"),
-        BotCommand(command="menu", description="📋 لیست تمام دستورات"),
-        BotCommand(command="help", description="📖 راهنما"),
-        BotCommand(command="profile", description="👤 پروفایل شما"),
-        BotCommand(command="time", description="🕒 زمان و تاریخ تهران"),
-        BotCommand(command="id", description="🆔 نمایش آیدی عددی"),
-        BotCommand(command="joke", description="😂 جوک تصادفی"),
-        BotCommand(command="quote", description="💬 نقل قول انگیزشی"),
-        BotCommand(command="ping", description="✅ وضعیت ربات"),
-        BotCommand(command="admin", description="⚙️ پنل ادمین"),
-        BotCommand(command="cancel", description="❌ لغو بازی حدس عدد"),
-        BotCommand(command="publishgroup", description="📤 انتشار گروه (ادمین)"),
-    ]
-    await bot.set_my_commands(commands)
-    logging.info("✅ دستورات با موفقیت در منوی ربات ثبت شدند.")
-
+    logging.info("🤖 ربات در حال راه‌اندازی...")
     await start_web()
-    logging.info("🤖 Starting bot...")
     await dp.start_polling(bot, skip_updates=True)
 
 if __name__ == "__main__":
