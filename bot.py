@@ -114,7 +114,7 @@ def admin_menu():
 
 def channel_check_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📢 عضویت در کانال", url=f"https://t.me/YourChannel")],
+        [InlineKeyboardButton(text="📢 عضویت در کانال", url=f"https://t.me/@Ajor_pareh")],
         [InlineKeyboardButton(text="✅ عضویت داشتم", callback_data="check_join")]
     ])
 
