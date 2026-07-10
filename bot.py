@@ -23,7 +23,7 @@ client = MongoClient(MONGO_URI)
 db = client["telegram_bot"]
 users_col = db["users"]
 files_col = db["files"]
-banned_col = db["banned"]
+banned_col = db["banned"]  # جدید برای مسدودها
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -36,10 +36,10 @@ DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
 
 OPENROUTER_API_KEY = "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"
 
-# ======== دیکشنری‌های سبک ========
-GREETINGS = {"سلام": "سلام! 👋", "خوبی": "خوبم ممنون!", "چطوری": "خوبم!", "مرسی": "خواهش!", "خداحافظ": "خداحافظ! 👋", "صبح بخیر": "صبح بخیر! ☀️", "شب بخیر": "شب بخیر! 🌙", "خوش اومدی": "خوش اومدی! ✨", "درود": "درود! 🌹"}
-JOKES = ["چرا مرغ از جاده رد شد؟ 😂", "پایتون بهترین زبان! 🐍", "پنگوئن گفت چقدر خنک! 😄", "ریاضیات غمگینه؟ بی‌جوابه!", "نارگیل تو رودخونه آب میشه!", "یه گربه گفت منوس! 😹"]
-QUOTES = ["به فکر فردا باش!", "بلند شدن دوباره!", "کد بزن لذت ببر!", "زندگی مثل شکلاته!", "بهترین زمان الان است!", "با امید تلاش کن! 🏔️"]
+# ======== دیکشنری‌های سبک (کم شده) ========
+GREETINGS = {"سلام": "سلام! 👋", "خوبی": "خوبم ممنون!", "چطوری": "خوبم!", "مرسی": "خواهش!", "خداحافظ": "خداحافظ! 👋", "صبح بخیر": "صبح بخیر! ☀️", "شب بخیر": "شب بخیر! 🌙"}
+JOKES = ["چرا مرغ از جاده رد شد؟ 😂", "پایتون بهترین زبان! 🐍", "پنگوئن گفت چقدر خنک! 😄", "ریاضیات غمگینه؟ بی‌جوابه!", "نارگیل تو رودخونه آب میشه!"]
+QUOTES = ["به فکر فردا باش!", "بلند شدن دوباره!", "کد بزن لذت ببر!", "زندگی مثل شکلاته!", "بهترین زمان الان است!"]
 FUNNY = ["چی میگی بچه خوشگل؟ 😏", "سیک تو بزن! 😂", "نمیفهمم حاجی!", "چرت و پرت نگو! 🤔"]
 
 guess_games = {}
@@ -114,20 +114,20 @@ def coin_menu():
 
 def admin_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton("📊 آمار", callback_data="stats")],
-        [InlineKeyboardButton("📋 کاربران", callback_data="user_list")],
-        [InlineKeyboardButton("📢 همگانی", callback_data="broadcast")],
-        [InlineKeyboardButton("🔍 جستجو", callback_data="search_user")],
-        [InlineKeyboardButton("🚫 مسدودها", callback_data="ban_management")],
-        [InlineKeyboardButton("⚙️ گروه", callback_data="group_manage")],
+        [InlineKeyboardButton("📊 آمار کامل", callback_data="stats")],
+        [InlineKeyboardButton("📋 لیست کاربران", callback_data="user_list")],
+        [InlineKeyboardButton("📢 ارسال همگانی", callback_data="broadcast")],
+        [InlineKeyboardButton("🔍 جستجوی کاربر", callback_data="search_user")],
+        [InlineKeyboardButton("🚫 مدیریت مسدودها", callback_data="ban_management")],
+        [InlineKeyboardButton("⚙️ مدیریت گروه", callback_data="group_manage")],
         [InlineKeyboardButton("🔙 برگشت", callback_data="back_main")]
     ])
 
 def group_manage_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton("🔒 قفل", callback_data="lock_group"), InlineKeyboardButton("🔓 باز", callback_data="unlock_group")],
-        [InlineKeyboardButton("🚫 بن", callback_data="ban_user"), InlineKeyboardButton("✅ رفع بن", callback_data="unban_user")],
-        [InlineKeyboardButton("🧹 پاک کردن", callback_data="clear_messages")],
+        [InlineKeyboardButton("🔒 قفل گروه", callback_data="lock_group"), InlineKeyboardButton("🔓 باز کردن", callback_data="unlock_group")],
+        [InlineKeyboardButton("🚫 بن کاربر", callback_data="ban_user"), InlineKeyboardButton("✅ رفع بن", callback_data="unban_user")],
+        [InlineKeyboardButton("🧹 پاک کردن پیام", callback_data="clear_messages")],
         [InlineKeyboardButton("🔙 برگشت", callback_data="admin_panel")]
     ])
 
@@ -145,7 +145,7 @@ async def start(message: types.Message):
     user_id = message.from_user.id
     name = message.from_user.first_name
     if await is_banned(user_id):
-        return await message.answer("🚫 مسدود هستید!")
+        return await message.answer("🚫 شما مسدود هستید!")
     if message.text and message.text.startswith("/start file_"):
         file_uuid = message.text.split("_")[1]
         file_data = files_col.find_one({"uuid": file_uuid})
@@ -195,7 +195,7 @@ async def get_youtube(message: types.Message):
             await message.answer_video(stream.url, caption=f"🎬 {yt.title}")
         else:
             await message.answer("❌ خطا!")
-    except Exception as e:
+    except:
         await message.answer("❌ لینک نامعتبر!")
 
 # ============================================
@@ -422,7 +422,7 @@ async def ban_management(callback: types.CallbackQuery):
             text += f"ID: {b['_id']}\n"
         await callback.message.answer(text)
     else:
-        await callback.message.answer("✅ هیچکس مسدود نیست.")
+        await callback.message.answer("✅ هیچ کاربری مسدود نیست.")
 
 @dp.callback_query(lambda c: c.data in ["ban_user", "unban_user"])
 async def ban_actions(callback: types.CallbackQuery):
@@ -447,6 +447,7 @@ async def ban_unban_cmd(message: types.Message):
             await bot.send_message(user_id, "🚫 توسط ادمین مسدود شدی!")
         except: pass
 
+# ======== مدیریت گروه با دکمه ========
 @dp.callback_query(lambda c: c.data == "group_manage")
 async def group_manage(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -509,14 +510,15 @@ async def handle_file_upload(message: types.Message):
     await message.answer(f"✅ آپلود شد!\n🔗 <code>{link}</code>", parse_mode="HTML")
 
 # ============================================
-# ======== دستورات عمومی ========
+# ======== دستورات عمومی (اصلاح‌شده) ========
 # ============================================
 @dp.message(Command("help"))
 async def help_command(message: types.Message):
     await message.answer(
         "📖 **راهنما**\n"
         "/start - شروع\n/time - زمان تهران\n/id - آیدی من\n/profile - پروفایل\n"
-        "/joke - جوک\n/quote - نقل قول\n/ping - وضعیت\n/admin - پنل\n/cancel - لغو حدس\n/upload - آپلود")
+        "/joke - جوک\n/quote - نقل قول\n/ping - وضعیت\n/admin - پنل\n/cancel - لغو حدس\n/upload - آپلود"
+    )
 
 @dp.message(Command("time"))
 async def time_command(message: types.Message):
@@ -541,11 +543,7 @@ async def profile_command(message: types.Message):
             joined = joined.strftime("%Y-%m-%d %H:%M")
         else:
             joined = "نامشخص"
-        await message.answer(
-            f"👤 {message.from_user.full_name}\n"
-            f"🆔 {message.from_user.id}\n"
-            f"📅 {joined}"
-        )
+        await message.answer(f"👤 {message.from_user.full_name}\n🆔 {message.from_user.id}\n📅 {joined}")
     else:
         await message.answer(f"👤 {message.from_user.full_name}\n🆔 {message.from_user.id}")
 
