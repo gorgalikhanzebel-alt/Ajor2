@@ -33,6 +33,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", 466050034))
 CHANNEL_ID = -1001277492702
 CHANNEL_LINK = "https://t.me/ajor_pareh"
 DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
+
 OPENROUTER_API_KEY = "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"
 
 # ======== دیکشنری‌های سبک ========
@@ -194,7 +195,7 @@ async def get_youtube(message: types.Message):
             await message.answer_video(stream.url, caption=f"🎬 {yt.title}")
         else:
             await message.answer("❌ خطا!")
-    except:
+    except Exception as e:
         await message.answer("❌ لینک نامعتبر!")
 
 # ============================================
@@ -508,7 +509,7 @@ async def handle_file_upload(message: types.Message):
     await message.answer(f"✅ آپلود شد!\n🔗 <code>{link}</code>", parse_mode="HTML")
 
 # ============================================
-# ======== دستورات عمومی (اصلاح‌شده) ========
+# ======== دستورات عمومی ========
 # ============================================
 @dp.message(Command("help"))
 async def help_command(message: types.Message):
