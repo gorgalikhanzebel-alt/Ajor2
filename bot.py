@@ -43,7 +43,6 @@ QUOTES = ["به فکر فردا باش!", "بلند شدن دوباره!", "کد
 FUNNY = ["چی میگی بچه خوشگل؟ 😏", "سیک تو بزن! 😂", "نمیفهمم حاجی!", "چرت و پرت نگو! 🤔"]
 
 guess_games = {}
-user_last_msg = {}  # برای ذخیره زمان آخرین پیام کاربر
 
 # ======== توابع ========
 async def is_admin(user_id): return user_id == ADMIN_ID
@@ -115,14 +114,13 @@ def coin_menu():
 
 def admin_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton("📊 آمار کامل", callback_data="stats")],
-        [InlineKeyboardButton("📋 لیست کاربران", callback_data="user_list")],
-        [InlineKeyboardButton("🔍 جستجوی کاربر", callback_data="search_user")],
-        [InlineKeyboardButton("👤 پروفایل کاربر", callback_data="view_profile")],
-        [InlineKeyboardButton("📢 ارسال همگانی", callback_data="broadcast")],
-        [InlineKeyboardButton("📨 ارسال به کانال", callback_data="send_channel")],
-        [InlineKeyboardButton("🚫 مدیریت مسدودها", callback_data="ban_management")],
-        [InlineKeyboardButton("⚙️ مدیریت گروه", callback_data="group_manage")],
+        [InlineKeyboardButton("📊 آمار", callback_data="stats")],
+        [InlineKeyboardButton("📋 کاربران", callback_data="user_list")],
+        [InlineKeyboardButton("🔍 جستجو", callback_data="search_user")],
+        [InlineKeyboardButton("👤 پروفایل", callback_data="view_profile")],
+        [InlineKeyboardButton("📢 همگانی", callback_data="broadcast")],
+        [InlineKeyboardButton("🚫 مسدودها", callback_data="ban_management")],
+        [InlineKeyboardButton("⚙️ گروه", callback_data="group_manage")],
         [InlineKeyboardButton("🔙 برگشت", callback_data="back_main")]
     ])
 
@@ -162,7 +160,7 @@ async def start(message: types.Message):
             return
         return await message.answer("❌ فایل یافت نشد.")
     if not users_col.find_one({"_id": user_id}):
-        users_col.insert_one({"_id": user_id, "name": name, "joined_at": datetime.now(), "last_msg": datetime.now()})
+        users_col.insert_one({"_id": user_id, "name": name, "joined_at": datetime.now()})
     if not await is_member(user_id):
         return await message.answer(f"👋 {name}!\nبرای استفاده، عضو کانال بشو:", reply_markup=channel_check_menu())
     await message.answer(f"🚀 سلام {name}!", reply_markup=main_menu())
@@ -321,7 +319,7 @@ async def admin_panel(callback: types.CallbackQuery):
     await callback.message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
     await callback.answer()
 
-# ------- آمار کامل -------
+# ------- آمار -------
 @dp.callback_query(lambda c: c.data == "stats")
 async def stats(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -339,22 +337,15 @@ async def stats(callback: types.CallbackQuery):
         f"📁 فایل‌ها: {files}"
     )
 
-# ------- لیست کاربران با صفحه‌بندی -------
-user_page = {}  # ذخیره صفحه فعلی هر ادمین
-
+# ------- لیست کاربران -------
 @dp.callback_query(lambda c: c.data == "user_list")
 async def user_list(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         return await callback.answer("⛔ دسترسی!", show_alert=True)
-    user_page[callback.from_user.id] = 0
-    await show_users(callback.message, callback.from_user.id, 0)
-
-async def show_users(message, user_id, page):
-    users = list(users_col.find().sort("joined_at", -1).skip(page * 10).limit(10))
+    users = list(users_col.find().sort("joined_at", -1).limit(20))
     if not users:
-        return await message.answer("📭 کاربری ثبت نشده.")
-    total = users_col.count_documents({})
-    text = f"📋 **کاربران (صفحه {page+1})**\n\n"
+        return await callback.message.answer("📭 کاربری ثبت نشده.")
+    text = "📋 **۲۰ کاربر اخیر**\n\n"
     for i, u in enumerate(users, 1):
         name = u.get("name", "نامشخص")
         joined = u.get("joined_at", "")
@@ -362,27 +353,8 @@ async def show_users(message, user_id, page):
             joined = joined.strftime("%Y-%m-%d")
         else:
             joined = "نامشخص"
-        text += f"{i+(page*10)}. {name} (ID: {u['_id']}) - {joined}\n"
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton("⬅️ قبلی", callback_data=f"user_page_{page-1}") if page > 0 else InlineKeyboardButton("⬅️ قبلی", callback_data="noop"),
-         InlineKeyboardButton("➡️ بعدی", callback_data=f"user_page_{page+1}") if (page+1)*10 < total else InlineKeyboardButton("➡️ بعدی", callback_data="noop")],
-        [InlineKeyboardButton("🔙 برگشت", callback_data="admin_panel")]
-    ])
-    await message.answer(text, reply_markup=kb)
-
-@dp.callback_query(lambda c: c.data.startswith("user_page_"))
-async def user_page_callback(callback: types.CallbackQuery):
-    if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی!", show_alert=True)
-    page = int(callback.data.split("_")[2])
-    if page < 0:
-        return await callback.answer("اولین صفحه!", show_alert=True)
-    await show_users(callback.message, callback.from_user.id, page)
-    await callback.answer()
-
-@dp.callback_query(lambda c: c.data == "noop")
-async def noop(callback: types.CallbackQuery):
-    await callback.answer()
+        text += f"{i}. {name} (ID: {u['_id']}) - {joined}\n"
+    await callback.message.answer(text)
 
 # ------- جستجوی کاربر -------
 @dp.callback_query(lambda c: c.data == "search_user")
@@ -399,7 +371,7 @@ async def handle_search(message: types.Message):
     if query.isdigit():
         user = users_col.find_one({"_id": int(query)})
         if user:
-            await show_user_profile(message, user)
+            await show_profile(message, user)
         else:
             await message.answer("❌ یافت نشد.")
     else:
@@ -417,7 +389,7 @@ async def handle_search(message: types.Message):
         else:
             await message.answer("❌ یافت نشد.")
 
-# ------- مشاهده پروفایل کاربر -------
+# ------- مشاهده پروفایل -------
 @dp.callback_query(lambda c: c.data == "view_profile")
 async def view_profile(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -425,16 +397,7 @@ async def view_profile(callback: types.CallbackQuery):
     await callback.message.answer("👤 آیدی عددی کاربر رو بفرست:")
     await callback.answer()
 
-@dp.message(lambda msg: msg.text and msg.text.isdigit() and await is_admin(msg.from_user.id))
-async def view_profile_cmd(message: types.Message):
-    user_id = int(message.text)
-    user = users_col.find_one({"_id": user_id})
-    if user:
-        await show_user_profile(message, user)
-    else:
-        await message.answer("❌ کاربر یافت نشد.")
-
-async def show_user_profile(message, user):
+async def show_profile(message, user):
     name = user.get("name", "نامشخص")
     uid = user.get("_id", "نامشخص")
     joined = user.get("joined_at", "")
@@ -442,21 +405,24 @@ async def show_user_profile(message, user):
         joined = joined.strftime("%Y-%m-%d %H:%M")
     else:
         joined = "نامشخص"
-    last_msg = user.get("last_msg", "")
-    if isinstance(last_msg, datetime):
-        last_msg = last_msg.strftime("%Y-%m-%d %H:%M")
-    else:
-        last_msg = "نامشخص"
     banned = await is_banned(uid)
     text = (
         f"👤 **پروفایل کاربر**\n\n"
         f"نام: {name}\n"
         f"🆔 آیدی: {uid}\n"
         f"📅 تاریخ عضویت: {joined}\n"
-        f"🕒 آخرین فعالیت: {last_msg}\n"
         f"🚫 وضعیت: {'مسدود' if banned else 'فعال'}"
     )
     await message.answer(text)
+
+@dp.message(lambda msg: msg.text and msg.text.isdigit() and await is_admin(msg.from_user.id))
+async def view_profile_cmd(message: types.Message):
+    user_id = int(message.text)
+    user = users_col.find_one({"_id": user_id})
+    if user:
+        await show_profile(message, user)
+    else:
+        await message.answer("❌ کاربر یافت نشد.")
 
 # ------- ارسال همگانی -------
 @dp.callback_query(lambda c: c.data == "broadcast")
@@ -469,7 +435,7 @@ async def broadcast(callback: types.CallbackQuery):
 @dp.message(lambda msg: msg.text and msg.reply_to_message and await is_admin(msg.from_user.id))
 async def handle_broadcast(message: types.Message):
     if not await is_admin(message.from_user.id): return
-    if "پیام همگانی رو بفرست" in message.reply_to_message.text:
+    if "پیام همگانی" in message.reply_to_message.text:
         text = message.text
         users = users_col.find()
         sent = 0
@@ -479,24 +445,6 @@ async def handle_broadcast(message: types.Message):
                 sent += 1
             except: pass
         await message.answer(f"✅ به {sent} کاربر ارسال شد.")
-
-# ------- ارسال به کانال -------
-@dp.callback_query(lambda c: c.data == "send_channel")
-async def send_channel(callback: types.CallbackQuery):
-    if not await is_admin(callback.from_user.id):
-        return await callback.answer("⛔ دسترسی!", show_alert=True)
-    await callback.message.answer("📨 پیام به کانال رو بفرست:")
-    await callback.answer()
-
-@dp.message(lambda msg: msg.text and await is_admin(msg.from_user.id))
-async def handle_send_channel(message: types.Message):
-    if not await is_admin(message.from_user.id): return
-    if message.reply_to_message and "پیام به کانال رو بفرست" in message.reply_to_message.text:
-        try:
-            await bot.send_message(CHANNEL_ID, message.text)
-            await message.answer("✅ پیام به کانال ارسال شد.")
-        except:
-            await message.answer("❌ خطا در ارسال به کانال!")
 
 # ------- مدیریت مسدودها -------
 @dp.callback_query(lambda c: c.data == "ban_management")
@@ -657,8 +605,6 @@ async def handle_text(message: types.Message):
         return await message.answer("🚫 مسدود!")
     if not await is_member(user_id):
         return await message.answer("❌ عضو کانال نیستی!", reply_markup=channel_check_menu())
-    # به‌روزرسانی آخرین فعالیت کاربر
-    users_col.update_one({"_id": user_id}, {"$set": {"last_msg": datetime.now()}})
     text = message.text.strip().lower()
     for key, response in GREETINGS.items():
         if key in text:
