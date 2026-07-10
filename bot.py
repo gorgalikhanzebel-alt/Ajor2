@@ -23,7 +23,7 @@ client = MongoClient(MONGO_URI)
 db = client["telegram_bot"]
 users_col = db["users"]
 files_col = db["files"]
-banned_col = db["banned"]  # جدید
+banned_col = db["banned"]
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -43,7 +43,7 @@ QUOTES = ["به فکر فردا باش!", "بلند شدن دوباره!", "کد
 FUNNY = ["چی میگی بچه خوشگل؟ 😏", "سیک تو بزن! 😂", "نمیفهمم حاجی!", "چرت و پرت نگو! 🤔"]
 
 guess_games = {}
-admin_state = {}  # برای نگهداری وضعیت ادمین (مانند انتظار برای ورودی)
+admin_state = {}
 
 # ======== توابع ========
 async def is_admin(user_id): return user_id == ADMIN_ID
@@ -311,7 +311,7 @@ async def back(callback: types.CallbackQuery):
     await callback.answer()
 
 # ============================================
-# ======== پنل ادمین ارتقا‌یافته ========
+# ======== پنل ادمین ========
 # ============================================
 @dp.callback_query(lambda c: c.data == "admin_panel")
 async def admin_panel(callback: types.CallbackQuery):
@@ -320,7 +320,6 @@ async def admin_panel(callback: types.CallbackQuery):
     await callback.message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
     await callback.answer()
 
-# ------- آمار -------
 @dp.callback_query(lambda c: c.data == "stats")
 async def stats(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -339,7 +338,6 @@ async def stats(callback: types.CallbackQuery):
     )
     await callback.answer()
 
-# ------- لیست کاربران -------
 @dp.callback_query(lambda c: c.data == "user_list")
 async def user_list(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -359,7 +357,6 @@ async def user_list(callback: types.CallbackQuery):
     await callback.message.answer(text)
     await callback.answer()
 
-# ------- جستجوی کاربر (با حالت) -------
 @dp.callback_query(lambda c: c.data == "search_user")
 async def search_user(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -368,7 +365,6 @@ async def search_user(callback: types.CallbackQuery):
     await callback.message.answer("🔍 آیدی یا نام کاربر رو بفرست:")
     await callback.answer()
 
-# ------- مشاهده پروفایل (با حالت) -------
 @dp.callback_query(lambda c: c.data == "view_profile")
 async def view_profile(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -377,7 +373,6 @@ async def view_profile(callback: types.CallbackQuery):
     await callback.message.answer("👤 آیدی عددی کاربر رو بفرست:")
     await callback.answer()
 
-# ------- مدیریت مسدودها (بن/رفع بن) -------
 @dp.callback_query(lambda c: c.data == "ban_user")
 async def ban_user_prompt(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -394,7 +389,6 @@ async def unban_user_prompt(callback: types.CallbackQuery):
     await callback.message.answer("✅ آیدی عددی کاربر رو برای رفع مسدود بفرست:")
     await callback.answer()
 
-# ------- مدیریت مسدودها (لیست) -------
 @dp.callback_query(lambda c: c.data == "ban_management")
 async def ban_management(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -409,7 +403,6 @@ async def ban_management(callback: types.CallbackQuery):
         await callback.message.answer("✅ هیچ کاربری مسدود نیست.")
     await callback.answer()
 
-# ------- ارسال همگانی -------
 @dp.callback_query(lambda c: c.data == "broadcast")
 async def broadcast(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -418,7 +411,6 @@ async def broadcast(callback: types.CallbackQuery):
     await callback.message.answer("📢 پیام همگانی رو بفرست:")
     await callback.answer()
 
-# ======== مدیریت گروه (دکمه‌ها) ========
 @dp.callback_query(lambda c: c.data == "group_manage")
 async def group_manage(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -444,18 +436,15 @@ async def clear_messages(callback: types.CallbackQuery):
     await callback.answer()
 
 # ============================================
-# ======== مدیریت ورودی‌های ادمین (حالت‌ها) ========
+# ======== مدیریت ورودی‌های ادمین ========
 # ============================================
 @dp.message()
 async def admin_input_handler(message: types.Message):
     user_id = message.from_user.id
-    if not await is_admin(user_id):
-        return
     state = admin_state.get(user_id)
-    if not state:
+    if not state or not await is_admin(user_id):
         return
 
-    # فقط در پیوی کار کن
     if message.chat.type != "private":
         return
 
@@ -552,7 +541,6 @@ async def admin_input_handler(message: types.Message):
         else:
             await message.answer("❌ لطفاً یک عدد معتبر بفرست.")
 
-# ======== تابع نمایش پروفایل ========
 async def show_profile(message, user):
     name = user.get("name", "نامشخص")
     uid = user.get("_id", "نامشخص")
@@ -570,6 +558,27 @@ async def show_profile(message, user):
         f"🚫 وضعیت: {'مسدود' if banned else 'فعال'}"
     )
     await message.answer(text)
+
+# ============================================
+# ======== پاسخ به پیام‌های عادی (غیرادمین) ========
+# ============================================
+@dp.message()
+async def handle_text(message: types.Message):
+    if message.chat.type != "private":
+        return
+    user_id = message.from_user.id
+    if await is_banned(user_id):
+        return await message.answer("🚫 مسدود!")
+    if not await is_member(user_id):
+        return await message.answer("❌ عضو کانال نیستی!", reply_markup=channel_check_menu())
+    text = message.text.strip().lower()
+    for key, response in GREETINGS.items():
+        if key in text:
+            return await message.answer(response)
+    ai_response = await ask_ai(text)
+    if ai_response:
+        return await message.answer(ai_response)
+    await message.answer(random.choice(FUNNY))
 
 # ============================================
 # ======== آپلود فایل ========
@@ -647,26 +656,6 @@ async def admin_command(message: types.Message):
     if not await is_admin(message.from_user.id):
         return await message.answer("⛔ دسترسی!")
     await message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
-
-# ============================================
-# ======== پیام‌های متنی (غیرادمین) ========
-# ============================================
-@dp.message()
-async def handle_text(message: types.Message):
-    if message.chat.type != "private": return
-    user_id = message.from_user.id
-    if await is_banned(user_id):
-        return await message.answer("🚫 مسدود!")
-    if not await is_member(user_id):
-        return await message.answer("❌ عضو کانال نیستی!", reply_markup=channel_check_menu())
-    text = message.text.strip().lower()
-    for key, response in GREETINGS.items():
-        if key in text:
-            return await message.answer(response)
-    ai_response = await ask_ai(text)
-    if ai_response:
-        return await message.answer(ai_response)
-    await message.answer(random.choice(FUNNY))
 
 # ============================================
 # ======== سرور ========
