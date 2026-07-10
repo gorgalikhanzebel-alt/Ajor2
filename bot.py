@@ -78,7 +78,7 @@ async def ask_ai(query):
 def get_tehran_time():
     return datetime.now(timezone.utc) + timedelta(hours=3, minutes=30)
 
-# ======== منوها ========
+# ======== منوهای شیشه‌ای (مهم) ========
 def main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton("🎬 یوتیوب", callback_data="youtube")],
@@ -139,14 +139,18 @@ def channel_check_menu():
     ])
 
 # ============================================
-# ======== START ========
+# ======== START (با منوی اصلی) ========
 # ============================================
 @dp.message(Command("start"))
 async def start(message: types.Message):
     user_id = message.from_user.id
     name = message.from_user.first_name
+    
+    # بررسی مسدودیت
     if await is_banned(user_id):
         return await message.answer("🚫 مسدود هستید!")
+    
+    # بررسی لینک فایل
     if message.text and message.text.startswith("/start file_"):
         file_uuid = message.text.split("_")[1]
         file_data = files_col.find_one({"uuid": file_uuid})
@@ -159,18 +163,30 @@ async def start(message: types.Message):
             else: await message.answer_document(file_id, caption=caption)
             return
         return await message.answer("❌ فایل یافت نشد.")
+    
+    # ثبت کاربر
     if not users_col.find_one({"_id": user_id}):
         users_col.insert_one({"_id": user_id, "name": name, "joined_at": datetime.now()})
+    
+    # بررسی عضویت در کانال
     if not await is_member(user_id):
         return await message.answer(f"👋 {name}!\nبرای استفاده، عضو کانال بشو:", reply_markup=channel_check_menu())
-    await message.answer(f"🚀 سلام {name}!", reply_markup=main_menu())
+    
+    # نمایش منوی اصلی با یک پیام خوش‌آمدگویی
+    await message.answer(
+        f"🚀 سلام {name}!\nبه ربات خوش آمدی. از دکمه‌های زیر استفاده کن:",
+        reply_markup=main_menu()
+    )
 
+# ============================================
+# ======== بررسی عضویت ========
+# ============================================
 @dp.callback_query(lambda c: c.data == "check_join")
 async def check_join(callback: types.CallbackQuery):
     if await is_banned(callback.from_user.id):
         return await callback.answer("🚫 مسدود!", show_alert=True)
     if await is_member(callback.from_user.id):
-        await callback.message.edit_text("✅ ممنون!")
+        await callback.message.edit_text("✅ ممنون! حالا می‌تونی استفاده کنی.")
         await callback.message.answer("🚀 منوی اصلی:", reply_markup=main_menu())
     else:
         await callback.answer("❌ عضو نشدی!", show_alert=True)
@@ -312,8 +328,6 @@ async def back(callback: types.CallbackQuery):
 # ============================================
 # ======== پنل ادمین (دستوری) ========
 # ============================================
-
-# ------- آمار -------
 @dp.message(Command("stats"))
 async def stats_cmd(message: types.Message):
     if not await is_admin(message.from_user.id):
@@ -331,7 +345,6 @@ async def stats_cmd(message: types.Message):
         f"📁 فایل‌ها: {files}"
     )
 
-# ------- لیست کاربران -------
 @dp.message(Command("users"))
 async def users_cmd(message: types.Message):
     if not await is_admin(message.from_user.id):
@@ -350,7 +363,6 @@ async def users_cmd(message: types.Message):
         text += f"{i}. {name} (ID: {u['_id']}) - {joined}\n"
     await message.answer(text)
 
-# ------- جستجوی کاربر -------
 @dp.message(Command("search"))
 async def search_cmd(message: types.Message):
     if not await is_admin(message.from_user.id):
@@ -379,7 +391,6 @@ async def search_cmd(message: types.Message):
         else:
             await message.answer("❌ کاربری یافت نشد.")
 
-# ------- مشاهده پروفایل -------
 @dp.message(Command("profile"))
 async def profile_admin_cmd(message: types.Message):
     if not await is_admin(message.from_user.id):
@@ -396,7 +407,6 @@ async def profile_admin_cmd(message: types.Message):
     else:
         await message.answer("❌ لطفاً یک آیدی عددی معتبر وارد کنید.")
 
-# ------- ارسال همگانی -------
 @dp.message(Command("broadcast"))
 async def broadcast_cmd(message: types.Message):
     if not await is_admin(message.from_user.id):
@@ -413,7 +423,6 @@ async def broadcast_cmd(message: types.Message):
         except: pass
     await message.answer(f"✅ پیام به {sent} کاربر ارسال شد.")
 
-# ------- مسدود کردن کاربر -------
 @dp.message(Command("ban"))
 async def ban_cmd(message: types.Message):
     if not await is_admin(message.from_user.id):
@@ -435,7 +444,6 @@ async def ban_cmd(message: types.Message):
     else:
         await message.answer("❌ لطفاً یک آیدی عددی معتبر وارد کنید.")
 
-# ------- رفع مسدودیت -------
 @dp.message(Command("unban"))
 async def unban_cmd(message: types.Message):
     if not await is_admin(message.from_user.id):
@@ -453,7 +461,6 @@ async def unban_cmd(message: types.Message):
     else:
         await message.answer("❌ لطفاً یک آیدی عددی معتبر وارد کنید.")
 
-# ------- لیست مسدودها -------
 @dp.message(Command("banned"))
 async def banned_list_cmd(message: types.Message):
     if not await is_admin(message.from_user.id):
@@ -467,7 +474,6 @@ async def banned_list_cmd(message: types.Message):
     else:
         await message.answer("✅ هیچ کاربری مسدود نیست.")
 
-# ------- مدیریت گروه -------
 @dp.message(Command("lock"))
 async def lock_cmd(message: types.Message):
     if not await is_admin(message.from_user.id):
@@ -524,7 +530,7 @@ async def show_profile(message, user):
     await message.answer(text)
 
 # ============================================
-# ======== دکمه‌های پنل ادمین (برای منو) ========
+# ======== دکمه‌های پنل ادمین ========
 # ============================================
 @dp.callback_query(lambda c: c.data == "admin_panel")
 async def admin_panel(callback: types.CallbackQuery):
@@ -633,8 +639,16 @@ async def handle_file_upload(message: types.Message):
 async def help_command(message: types.Message):
     await message.answer(
         "📖 **راهنما**\n"
-        "/start - شروع\n/time - زمان تهران\n/id - آیدی من\n/profile - پروفایل من\n"
-        "/joke - جوک\n/quote - نقل قول\n/ping - وضعیت\n/admin - پنل ادمین\n/cancel - لغو حدس\n/upload - آپلود (ادمین)"
+        "/start - شروع و منوی اصلی\n"
+        "/time - زمان تهران\n"
+        "/id - آیدی من\n"
+        "/profile - پروفایل من\n"
+        "/joke - جوک\n"
+        "/quote - نقل قول\n"
+        "/ping - وضعیت\n"
+        "/admin - پنل ادمین\n"
+        "/cancel - لغو حدس\n"
+        "/upload - آپلود (ادمین)"
     )
 
 @dp.message(Command("time"))
