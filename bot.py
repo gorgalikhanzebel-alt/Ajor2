@@ -95,7 +95,6 @@ GREETINGS = {
 }
 
 guess_games = {}
-user_states = {}
 
 async def is_admin(user_id: int) -> bool:
     return user_id == ADMIN_ID
@@ -604,33 +603,57 @@ async def handle_search_user(message: types.Message):
     else:
         await message.answer("❌ کاربری با این مشخصات پیدا نشد.")
 
+# ======== دستور جدید برای مشاهده فعالیت‌های کاربر ========
+@dp.message(Command("activity"))
+async def activity_command(message: types.Message):
+    if not await is_admin(message.from_user.id):
+        await message.answer("⛔ فقط ادمین می‌تواند از این دستور استفاده کند!")
+        return
+    
+    # استخراج آیدی از دستور
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.answer("❌ لطفاً آیدی کاربر را وارد کنید.\nمثال: `/activity 123456789`", parse_mode="Markdown")
+        return
+    
+    try:
+        target_user_id = int(parts[1])
+    except ValueError:
+        await message.answer("❌ آیدی وارد شده معتبر نیست. لطفاً یک عدد وارد کنید.")
+        return
+    
+    # بررسی وجود کاربر
+    target_user = users_col.find_one({"_id": target_user_id})
+    if not target_user:
+        await message.answer("❌ کاربری با این آیدی پیدا نشد.")
+        return
+    
+    # دریافت فعالیت‌ها
+    activities = list(activities_col.find({"user_id": target_user_id}).sort("timestamp", -1).limit(20))
+    if not activities:
+        await message.answer(f"📋 کاربر {target_user_id} هیچ فعالیتی نداشته است.")
+        return
+    
+    # ساخت متن پاسخ
+    result = f"📋 **فعالیت‌های کاربر {target_user_id}**\n\n"
+    for act in activities:
+        result += f"🕐 {act['timestamp']}\n➡️ {act['action']} - {act.get('details', '')}\n\n"
+    
+    await message.answer(result[:4000])
+
 @dp.callback_query(lambda c: c.data == "user_activities")
 async def user_activities_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
-    user_states[callback.from_user.id] = "waiting_for_user_id"
-    await callback.message.answer("📋 **مشاهده فعالیت‌های کاربر**\n\nلطفاً آیدی عددی کاربر را وارد کنید:")
+    await callback.message.answer(
+        "📋 **مشاهده فعالیت‌های کاربر**\n\n"
+        "برای مشاهده فعالیت‌های یک کاربر، از دستور زیر استفاده کنید:\n"
+        "`/activity آیدی_کاربر`\n\n"
+        "مثال: `/activity 123456789`",
+        parse_mode="Markdown"
+    )
     await callback.answer()
-
-@dp.message(lambda msg: msg.text and msg.text.isdigit() and msg.from_user.id == ADMIN_ID)
-async def handle_user_activities(message: types.Message):
-    if user_states.get(message.from_user.id) != "waiting_for_user_id":
-        return
-    user_id = int(message.text)
-    user = users_col.find_one({"_id": user_id})
-    if not user:
-        await message.answer("❌ کاربر یافت نشد!")
-        return
-    activities = list(activities_col.find({"user_id": user_id}).sort("timestamp", -1).limit(20))
-    if not activities:
-        await message.answer("📋 این کاربر هیچ فعالیتی نداشته است.")
-        return
-    text = f"📋 **فعالیت‌های کاربر {user_id}**\n\n"
-    for act in activities:
-        text += f"🕐 {act['timestamp']}\n➡️ {act['action']} - {act.get('details', '')}\n\n"
-    await message.answer(text[:4000])
-    del user_states[message.from_user.id]
 
 @dp.callback_query(lambda c: c.data == "upload_file")
 async def upload_file_callback(callback: types.CallbackQuery):
@@ -791,7 +814,8 @@ async def help_command(message: types.Message):
         "/ping - بررسی وضعیت ربات\n"
         "/admin - پنل ادمین\n"
         "/cancel - لغو بازی حدس عدد\n"
-        "/test - تست کد جدید"
+        "/test - تست کد جدید\n"
+        "/activity [آیدی] - مشاهده فعالیت‌های کاربر (فقط ادمین)"
     )
 
 @dp.message(Command("profile"))
@@ -849,7 +873,7 @@ async def handle_text(message: types.Message):
     name = message.from_user.first_name or "کاربر"
     text = message.text.strip().lower()
 
-    # ======== ثبت خودکار کاربر ========
+    # ثبت خودکار کاربر
     user = users_col.find_one({"_id": user_id})
     if not user:
         user = users_col.find_one({"_id": str(user_id)})
@@ -863,27 +887,7 @@ async def handle_text(message: types.Message):
         })
         logging.info(f"✅ کاربر جدید ثبت شد: {user_id} - {name}")
 
-    # ======== بررسی وضعیت "فعالیت‌های کاربر" ========
-    if user_states.get(user_id) == "waiting_for_user_id" and text.isdigit():
-        target_user_id = int(text)
-        target_user = users_col.find_one({"_id": target_user_id})
-        if not target_user:
-            await message.answer("❌ کاربر یافت نشد!")
-            del user_states[user_id]
-            return
-        activities = list(activities_col.find({"user_id": target_user_id}).sort("timestamp", -1).limit(20))
-        if not activities:
-            await message.answer("📋 این کاربر هیچ فعالیتی نداشته است.")
-            del user_states[user_id]
-            return
-        result = f"📋 **فعالیت‌های کاربر {target_user_id}**\n\n"
-        for act in activities:
-            result += f"🕐 {act['timestamp']}\n➡️ {act['action']} - {act.get('details', '')}\n\n"
-        await message.answer(result[:4000])
-        del user_states[user_id]
-        return
-
-    # ======== منو ========
+    # منو
     if text == "منو" or text == "menu":
         if not await is_member(user_id):
             await message.answer(
@@ -896,7 +900,7 @@ async def handle_text(message: types.Message):
         await log_activity(user_id, "menu", "درخواست منو")
         return
 
-    # ======== بررسی عضویت برای سایر پیام‌ها ========
+    # بررسی عضویت برای سایر پیام‌ها
     if not await is_member(user_id):
         await message.answer(
             "❌ شما عضو کانال ما نیستی!\n"
@@ -905,21 +909,21 @@ async def handle_text(message: types.Message):
         )
         return
 
-    # ======== احوال‌پرسی ========
+    # احوال‌پرسی
     for key, response in GREETINGS.items():
         if key in text:
             await message.answer(response)
             await log_activity(user_id, "greeting", f"گفت: {text}")
             return
 
-    # ======== هوش مصنوعی ========
+    # هوش مصنوعی
     ai_response = await ask_ai(text)
     if ai_response:
         await message.answer(ai_response)
         await log_activity(user_id, "ai_chat", f"پرسید: {text}")
         return
 
-    # ======== جملات خنده‌دار ========
+    # جملات خنده‌دار
     await message.answer(random.choice(FUNNY_FALLBACKS))
     await log_activity(user_id, "fallback", f"پرسید: {text}")
 
