@@ -31,7 +31,7 @@ dp = Dispatcher()
 logging.basicConfig(level=logging.INFO)
 
 # ======== تنظیمات ========
-ADMIN_ID = 466050034  # <-- آیدی شما مستقیماً در کد
+ADMIN_ID = 466050034
 CHANNEL_ID = -1001277492702
 CHANNEL_LINK = "https://t.me/ajor_pareh"
 DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
@@ -222,32 +222,6 @@ def channel_check_menu():
         [InlineKeyboardButton(text="📢 عضویت در کانال", url=CHANNEL_LINK)],
         [InlineKeyboardButton(text="✅ عضویت داشتم", callback_data="check_join")]
     ])
-
-def user_list_menu(users, page=0, per_page=10):
-    total = len(users)
-    start = page * per_page
-    end = min(start + per_page, total)
-    page_users = users[start:end]
-    
-    keyboard = []
-    for user in page_users:
-        name = user.get("name", "بدون نام")
-        keyboard.append([InlineKeyboardButton(
-            text=f"🆔 {user['_id']} - {name[:20]}",
-            callback_data=f"user_detail_{user['_id']}"
-        )])
-    
-    nav_buttons = []
-    if page > 0:
-        nav_buttons.append(InlineKeyboardButton("◀️ قبلی", callback_data=f"users_page_{page-1}"))
-    if end < total:
-        nav_buttons.append(InlineKeyboardButton("بعدی ▶️", callback_data=f"users_page_{page+1}"))
-    if nav_buttons:
-        keyboard.append(nav_buttons)
-    
-    keyboard.append([InlineKeyboardButton("🔙 برگشت", callback_data="admin_panel")])
-    
-    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 # ======== ارسال فایل‌های یک گروه ========
 async def send_group_files(message: types.Message, group_uuid: str):
@@ -596,71 +570,35 @@ async def stats_callback(callback: types.CallbackQuery):
     )
     await callback.answer()
 
-# ======== لیست کاربران ========
-user_list_page = {}
-
+# ======== لیست کاربران (ساده و بدون صفحه‌بندی) ========
 @dp.callback_query(lambda c: c.data == "list_users")
 async def list_users_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
     
-    all_users = list(users_col.find().sort("_id", 1))
-    user_list_page[callback.from_user.id] = 0
+    # گرفتن تمام کاربران (حداکثر ۵۰ نفر اول)
+    all_users = list(users_col.find().sort("_id", 1).limit(50))
     
+    if not all_users:
+        await callback.message.answer("📋 هیچ کاربری در دیتابیس ثبت نشده است.")
+        await callback.answer()
+        return
+    
+    text = "👥 **لیست کاربران (۵۰ نفر اول)**\n\n"
+    for user in all_users:
+        user_id = user["_id"]
+        name = user.get("name", "بدون نام")
+        joined = user.get("joined_at", "نامشخص")
+        status = "🚫" if user.get("is_banned", False) else "✅"
+        text += f"{status} 🆔 `{user_id}` - {name} (تاریخ ثبت: {joined})\n"
+    
+    # ارسال لیست
     await callback.message.answer(
-        f"👥 **لیست کاربران** (صفحه ۱ از {((len(all_users)-1)//10 + 1)})",
-        reply_markup=user_list_menu(all_users, 0)
-    )
-    await callback.answer()
-
-@dp.callback_query(lambda c: c.data.startswith("users_page_"))
-async def users_page_callback(callback: types.CallbackQuery):
-    if not await is_admin(callback.from_user.id):
-        await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
-        return
-    
-    page = int(callback.data.split("_")[2])
-    user_list_page[callback.from_user.id] = page
-    
-    all_users = list(users_col.find().sort("_id", 1))
-    total_pages = ((len(all_users)-1)//10 + 1)
-    
-    await callback.message.edit_text(
-        f"👥 **لیست کاربران** (صفحه {page+1} از {total_pages})",
-        reply_markup=user_list_menu(all_users, page)
-    )
-    await callback.answer()
-
-# ======== جزئیات کاربر ========
-@dp.callback_query(lambda c: c.data.startswith("user_detail_"))
-async def user_detail_callback(callback: types.CallbackQuery):
-    if not await is_admin(callback.from_user.id):
-        await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
-        return
-    
-    user_id = int(callback.data.split("_")[2])
-    user = users_col.find_one({"_id": user_id})
-    if not user:
-        await callback.answer("❌ کاربر یافت نشد!", show_alert=True)
-        return
-    
-    recent_activities = list(activities_col.find({"user_id": user_id}).sort("timestamp", -1).limit(5))
-    activity_text = "\n".join([f"• {act['action']} - {act['timestamp']}" for act in recent_activities]) if recent_activities else "هیچ فعالیتی"
-    
-    status = "🚫 بن شده" if user.get("is_banned", False) else "✅ فعال"
-    
-    await callback.message.answer(
-        f"👤 **جزئیات کاربر**\n\n"
-        f"🆔 آیدی: `{user['_id']}`\n"
-        f"📛 نام: {user.get('name', 'نامشخص')}\n"
-        f"📊 وضعیت: {status}\n"
-        f"📅 تاریخ ثبت‌نام: {user.get('joined_at', 'نامشخص')}\n"
-        f"🕐 آخرین فعالیت: {user.get('last_activity', 'نامشخص')}\n\n"
-        f"📋 **آخرین فعالیت‌ها:**\n{activity_text}",
+        text,
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton("🔙 برگشت به لیست", callback_data="list_users")]
+            [InlineKeyboardButton(text="🔙 برگشت به پنل ادمین", callback_data="admin_panel")]
         ])
     )
     await callback.answer()
@@ -691,8 +629,8 @@ async def handle_search_user(message: types.Message):
     if users:
         text = "📋 **نتایج جستجو:**\n\n"
         for u in users[:10]:
-            text += f"🆔 {u['_id']} - {u.get('name', 'نامشخص')}\n"
-        await message.answer(text)
+            text += f"🆔 `{u['_id']}` - {u.get('name', 'نامشخص')}\n"
+        await message.answer(text, parse_mode="Markdown")
     else:
         await message.answer("❌ کاربری با این مشخصات پیدا نشد.")
 
@@ -969,7 +907,6 @@ async def handle_text(message: types.Message):
 
     user_id = message.from_user.id
 
-    # بررسی اینکه کاربر در دیتابیس ثبت شده یا نه
     if not users_col.find_one({"_id": user_id}):
         await message.answer("👋 لطفاً ابتدا /start را بزنید.")
         return
