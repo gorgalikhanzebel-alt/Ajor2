@@ -30,7 +30,6 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 logging.basicConfig(level=logging.INFO)
 
-# ======== تنظیمات ========
 ADMIN_ID = 466050034
 CHANNEL_ID = -1001277492702
 CHANNEL_LINK = "https://t.me/ajor_pareh"
@@ -38,7 +37,6 @@ DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
 
 OPENROUTER_API_KEY = "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"
 
-# ======== دیتاهای قبلی ========
 FUNNY_FALLBACKS = [
     "چی میگی بچه خوشگل؟ 😏",
     "سیک تو بزن تا سیکمو نزدن 😂",
@@ -98,7 +96,6 @@ GREETINGS = {
 
 guess_games = {}
 
-# ======== توابع کمکی ========
 async def is_admin(user_id: int) -> bool:
     return user_id == ADMIN_ID
 
@@ -110,16 +107,19 @@ async def is_member(user_id: int) -> bool:
         return False
 
 async def log_activity(user_id: int, action: str, details: str = ""):
-    activities_col.insert_one({
-        "user_id": user_id,
-        "action": action,
-        "details": details,
-        "timestamp": datetime.now()
-    })
-    users_col.update_one(
-        {"_id": user_id},
-        {"$set": {"last_activity": datetime.now()}}
-    )
+    try:
+        activities_col.insert_one({
+            "user_id": user_id,
+            "action": action,
+            "details": details,
+            "timestamp": datetime.now()
+        })
+        users_col.update_one(
+            {"_id": user_id},
+            {"$set": {"last_activity": datetime.now()}}
+        )
+    except:
+        pass
 
 async def ask_ai_openrouter(query: str) -> str:
     url = "https://openrouter.ai/api/v1/chat/completions"
@@ -168,7 +168,6 @@ async def ask_ai(query: str) -> str:
 def get_tehran_time():
     return datetime.now(timezone.utc) + timedelta(hours=3, minutes=30)
 
-# ======== منوها ========
 def main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🎬 دانلود یوتیوب", callback_data="youtube")],
@@ -223,20 +222,16 @@ def channel_check_menu():
         [InlineKeyboardButton(text="✅ عضویت داشتم", callback_data="check_join")]
     ])
 
-# ======== ارسال فایل‌های یک گروه ========
 async def send_group_files(message: types.Message, group_uuid: str):
     files = list(files_col.find({"group_uuid": group_uuid}).sort("uploaded_at", 1))
     if not files:
         await message.answer("❌ این گروه فایلی ندارد.")
         return
-    
     await message.answer(f"📂 **{len(files)} فایل** یافت شد. در حال ارسال...")
-    
     for f in files:
         file_id = f["file_id"]
         file_type = f["type"]
         caption = f.get("caption", DEFAULT_CAPTION)
-        
         try:
             if file_type == "photo":
                 await message.answer_photo(file_id, caption=caption)
@@ -247,15 +242,12 @@ async def send_group_files(message: types.Message, group_uuid: str):
             await asyncio.sleep(0.5)
         except Exception as e:
             logging.error(f"خطا در ارسال فایل {f.get('uuid')}: {e}")
-    
     await message.answer("✅ **همه فایل‌های این گروه ارسال شدند!**")
 
-# ======== دستور /test ========
 @dp.message(Command("test"))
 async def test_command(message: types.Message):
     await message.answer("✅ کد جدید با موفقیت روی سرور اجرا شده است! 🎉")
 
-# ======== دستور /start ========
 @dp.message(Command("start"))
 async def start(message: types.Message):
     user_id = message.from_user.id
@@ -325,7 +317,6 @@ async def start(message: types.Message):
         reply_markup=main_menu()
     )
 
-# ======== بررسی مجدد عضویت ========
 @dp.callback_query(lambda c: c.data == "check_join")
 async def check_join(callback: types.CallbackQuery):
     user_id = callback.from_user.id
@@ -335,7 +326,6 @@ async def check_join(callback: types.CallbackQuery):
     else:
         await callback.answer("❌ هنوز عضو کانال نشدی! اول عضو شو.", show_alert=True)
 
-# ======== دانلود یوتیوب ========
 @dp.callback_query(lambda c: c.data == "youtube")
 async def youtube(callback: types.CallbackQuery):
     if not await is_member(callback.from_user.id):
@@ -366,7 +356,6 @@ async def get_youtube(message: types.Message):
         logging.error(f"YouTube error: {e}")
         await message.answer("❌ خطا! لینک معتبر نیست یا ویدیو در دسترس نیست.")
 
-# ======== دکمه‌های منوی اصلی ========
 @dp.callback_query(lambda c: c.data == "wallet")
 async def wallet_callback(callback: types.CallbackQuery):
     await callback.message.answer("💳 کیف پول شما:\nموجودی: ۰ تومان\n\nاین بخش به زودی تکمیل می‌شود.")
@@ -388,7 +377,6 @@ async def profile_user_callback(callback: types.CallbackQuery):
     await callback.message.answer(f"👤 نام: {user.full_name}\n🆔 آیدی: {user.id}\n📱 شماره: ثبت نشده")
     await callback.answer()
 
-# ======== بازی‌ها ========
 @dp.callback_query(lambda c: c.data == "game")
 async def game(callback: types.CallbackQuery):
     if not await is_member(callback.from_user.id):
@@ -447,7 +435,6 @@ async def rps_play(callback: types.CallbackQuery):
     await log_activity(callback.from_user.id, "rps", f"سنگ‌کاغذ‌قیچی: {result}")
     await callback.answer()
 
-# ======== بازی حدس عدد ========
 @dp.callback_query(lambda c: c.data == "guess_game")
 async def guess_game(callback: types.CallbackQuery):
     if not await is_member(callback.from_user.id):
@@ -499,7 +486,6 @@ async def handle_guess_number(message: types.Message):
     else:
         await message.answer(f"📉 کمتر از {guess} است. دوباره تلاش کن.")
 
-# ======== بازی شیر یا خط ========
 @dp.callback_query(lambda c: c.data == "coin_flip")
 async def coin_flip(callback: types.CallbackQuery):
     if not await is_member(callback.from_user.id):
@@ -523,7 +509,6 @@ async def coin_play(callback: types.CallbackQuery):
     await log_activity(callback.from_user.id, "coin_flip", f"شیر یا خط: {result}")
     await callback.answer()
 
-# ======== برگشت‌ها ========
 @dp.callback_query(lambda c: c.data == "back_main")
 async def back_main(callback: types.CallbackQuery):
     await callback.message.answer("🔙 منوی اصلی:", reply_markup=main_menu())
@@ -534,17 +519,14 @@ async def back_game(callback: types.CallbackQuery):
     await callback.message.answer("🔙 منوی بازی:", reply_markup=game_menu())
     await callback.answer()
 
-# ======== پنل ادمین ========
 @dp.callback_query(lambda c: c.data == "admin_panel")
 async def admin_panel_callback(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     logging.info(f"🔍 کالبک admin_panel از کاربر {user_id} دریافت شد.")
-    
     if not await is_admin(user_id):
         logging.warning(f"⛔ کاربر {user_id} دسترسی به پنل ادمین ندارد.")
         await callback.answer("⛔ شما ادمین نیستید!", show_alert=True)
         return
-    
     logging.info(f"✅ کاربر {user_id} ادمین است. نمایش پنل.")
     await callback.message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
     await callback.answer()
@@ -554,7 +536,6 @@ async def stats_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
-    
     total_users = users_col.count_documents({})
     total_files = files_col.count_documents({})
     total_groups = groups_col.count_documents({})
@@ -562,7 +543,6 @@ async def stats_callback(callback: types.CallbackQuery):
     active_today = activities_col.count_documents({
         "timestamp": {"$gte": datetime.now() - timedelta(days=1)}
     })
-    
     await callback.message.answer(
         f"📊 **آمار کلی ربات**\n\n"
         f"👥 تعداد کل کاربران: {total_users}\n"
@@ -575,27 +555,22 @@ async def stats_callback(callback: types.CallbackQuery):
     )
     await callback.answer()
 
-# ======== لیست کاربران ========
 @dp.callback_query(lambda c: c.data == "list_users")
 async def list_users_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
-    
     all_users = list(users_col.find().sort("_id", 1).limit(50))
-    
     if not all_users:
         await callback.message.answer("📋 هیچ کاربری در دیتابیس ثبت نشده است.")
         await callback.answer()
         return
-    
     text = "👥 **لیست کاربران (۵۰ نفر اول)**\n\n"
     for user in all_users:
         user_id = user["_id"]
         name = user.get("name", "بدون نام")
         status = "🚫" if user.get("is_banned", False) else "✅"
         text += f"{status} 🆔 `{user_id}` - {name}\n"
-    
     await callback.message.answer(
         text,
         parse_mode="Markdown",
@@ -605,20 +580,17 @@ async def list_users_callback(callback: types.CallbackQuery):
     )
     await callback.answer()
 
-# ======== جستجوی کاربر ========
 @dp.callback_query(lambda c: c.data == "search_user")
 async def search_user_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
-    
     await callback.message.answer("🔍 **جستجوی کاربر**\n\nلطفاً آیدی عددی یا نام کاربر را وارد کنید:")
     await callback.answer()
 
 @dp.message(lambda msg: msg.text and msg.from_user.id == ADMIN_ID)
 async def handle_search_user(message: types.Message):
     query = message.text.strip()
-    
     if query.isdigit():
         user = users_col.find_one({"_id": int(query)})
         if user:
@@ -626,7 +598,6 @@ async def handle_search_user(message: types.Message):
                 f"✅ کاربر پیدا شد!\n🆔 آیدی: {user['_id']}\n📛 نام: {user.get('name', 'نامشخص')}\n📊 وضعیت: {'🚫 بن شده' if user.get('is_banned') else '✅ فعال'}"
             )
             return
-    
     users = list(users_col.find({"name": {"$regex": query, "$options": "i"}}))
     if users:
         text = "📋 **نتایج جستجو:**\n\n"
@@ -636,13 +607,11 @@ async def handle_search_user(message: types.Message):
     else:
         await message.answer("❌ کاربری با این مشخصات پیدا نشد.")
 
-# ======== فعالیت‌های کاربر ========
 @dp.callback_query(lambda c: c.data == "user_activities")
 async def user_activities_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
-    
     await callback.message.answer("📋 **مشاهده فعالیت‌های کاربر**\n\nلطفاً آیدی عددی کاربر را وارد کنید:")
     await callback.answer()
 
@@ -653,30 +622,24 @@ async def handle_user_activities(message: types.Message):
     if not user:
         await message.answer("❌ کاربر یافت نشد!")
         return
-    
     activities = list(activities_col.find({"user_id": user_id}).sort("timestamp", -1).limit(20))
     if not activities:
         await message.answer("📋 این کاربر هیچ فعالیتی نداشته است.")
         return
-    
     text = f"📋 **فعالیت‌های کاربر {user_id}**\n\n"
     for act in activities:
         text += f"🕐 {act['timestamp']}\n➡️ {act['action']} - {act.get('details', '')}\n\n"
-    
     await message.answer(text[:4000])
 
-# ======== شروع آپلود گروه جدید ========
 @dp.callback_query(lambda c: c.data == "upload_file")
 async def upload_file_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
-    
     groups_col.update_many(
         {"admin_id": callback.from_user.id, "is_active": True},
         {"$set": {"is_active": False}}
     )
-    
     group_uuid = str(uuid.uuid4())[:8]
     groups_col.insert_one({
         "group_uuid": group_uuid,
@@ -685,7 +648,6 @@ async def upload_file_callback(callback: types.CallbackQuery):
         "is_active": True,
         "file_count": 0
     })
-    
     await callback.message.answer(
         f"📤 **گروه جدید ساخته شد!**\n"
         f"شناسه گروه: `{group_uuid}`\n\n"
@@ -695,31 +657,23 @@ async def upload_file_callback(callback: types.CallbackQuery):
     )
     await callback.answer()
 
-# ======== انتشار گروه ========
 @dp.callback_query(lambda c: c.data == "publish_group")
 async def publish_group_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
-    
     group = groups_col.find_one({"admin_id": callback.from_user.id, "is_active": True})
-    
     if not group:
         await callback.answer("❌ شما هیچ گروه فعالی ندارید.", show_alert=True)
         return
-
     group_uuid = group["group_uuid"]
     file_count = group.get("file_count", 0)
-    
     if file_count == 0:
         await callback.answer("❌ این گروه هیچ فایلی ندارد.", show_alert=True)
         return
-
     groups_col.update_one({"group_uuid": group_uuid}, {"$set": {"is_active": False}})
-
     bot_info = await bot.get_me()
     link = f"https://t.me/{bot_info.username}?start=group_{group_uuid}"
-
     text = (
         f"✅ **گروه با موفقیت منتشر شد!**\n\n"
         f"🔗 لینک گروه:\n<code>{link}</code>\n\n"
@@ -729,20 +683,16 @@ async def publish_group_callback(callback: types.CallbackQuery):
     await callback.message.answer(text, parse_mode="HTML")
     await callback.answer()
 
-# ======== دریافت فایل‌ها ========
 @dp.message(lambda msg: msg.document or msg.photo or msg.video)
 async def handle_file_upload(message: types.Message):
     if not await is_admin(message.from_user.id):
         await message.answer("⛔ فقط ادمین می‌تواند فایل آپلود کند!")
         return
-
     group = groups_col.find_one({"admin_id": message.from_user.id, "is_active": True})
     if not group:
         await message.answer("❌ ابتدا با دکمه 'شروع آپلود گروه جدید' یک گروه بسازید.")
         return
-
     group_uuid = group["group_uuid"]
-
     if message.document:
         file_id = message.document.file_id
         file_type = "document"
@@ -757,10 +707,8 @@ async def handle_file_upload(message: types.Message):
         file_name = "ویدئو"
     else:
         return
-
     file_uuid = str(uuid.uuid4())[:8]
     caption = message.caption if message.caption else DEFAULT_CAPTION
-
     files_col.insert_one({
         "uuid": file_uuid,
         "group_uuid": group_uuid,
@@ -770,33 +718,27 @@ async def handle_file_upload(message: types.Message):
         "caption": caption,
         "uploaded_at": datetime.now()
     })
-
     groups_col.update_one(
         {"group_uuid": group_uuid},
         {"$inc": {"file_count": 1}}
     )
-
     updated_group = groups_col.find_one({"group_uuid": group_uuid})
     new_count = updated_group["file_count"] if updated_group else 0
-
     await message.answer(
         f"✅ فایل `{file_name}` با موفقیت به گروه اضافه شد.\n"
         f"تعداد فایل‌های گروه: {new_count}",
         parse_mode="Markdown"
     )
 
-# ======== مدیریت گروه‌ها ========
 @dp.callback_query(lambda c: c.data == "manage_groups")
 async def manage_groups_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
-    
     groups = list(groups_col.find({"admin_id": callback.from_user.id}).sort("created_at", -1).limit(20))
     if not groups:
         await callback.message.answer("📋 شما هیچ گروهی ایجاد نکرده‌اید.")
         return
-    
     keyboard = []
     for g in groups:
         status = "✅ فعال" if g.get("is_active", False) else "🔒 بسته"
@@ -806,7 +748,6 @@ async def manage_groups_callback(callback: types.CallbackQuery):
             callback_data=f"group_info_{g['group_uuid']}"
         )])
     keyboard.append([InlineKeyboardButton(text="🔙 برگشت", callback_data="admin_panel")])
-    
     await callback.message.answer(
         "📋 **لیست گروه‌های شما**",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
@@ -818,16 +759,13 @@ async def group_info_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
-    
     group_uuid = callback.data.split("_")[2]
     group = groups_col.find_one({"group_uuid": group_uuid})
     if not group:
         await callback.answer("❌ گروه یافت نشد.", show_alert=True)
         return
-    
     files = list(files_col.find({"group_uuid": group_uuid}).sort("uploaded_at", 1))
     file_names = "\n".join([f"• {f.get('name', 'بی‌نام')}" for f in files]) if files else "هیچ فایلی"
-    
     await callback.message.answer(
         f"📁 **اطلاعات گروه**\n"
         f"شناسه: `{group_uuid}`\n"
@@ -838,7 +776,6 @@ async def group_info_callback(callback: types.CallbackQuery):
     )
     await callback.answer()
 
-# ======== دستورات ========
 @dp.message(Command("help"))
 async def help_command(message: types.Message):
     await message.answer(
@@ -902,30 +839,33 @@ async def admin_command(message: types.Message):
         return
     await message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
 
-# ======== پاسخ به پیام‌های متنی ========
 @dp.message()
 async def handle_text(message: types.Message):
     if message.chat.type != "private":
         return
 
     user_id = message.from_user.id
-    name = message.from_user.first_name
+    name = message.from_user.first_name or "کاربر"
     text = message.text.strip().lower()
 
-    # ======== اگر کاربر کلمه "منو" یا "menu" رو فرستاد، مثل /start عمل کن ========
-    if text == "منو" or text == "menu":
-        # ثبت کاربر اگر وجود نداشته باشد
-        if not users_col.find_one({"_id": user_id}):
-            users_col.insert_one({
-                "_id": user_id,
-                "name": name,
-                "joined_at": datetime.now(),
-                "last_activity": datetime.now(),
-                "is_banned": False
-            })
-            logging.info(f"✅ کاربر جدید ثبت شد (از طریق منو): {user_id} - {name}")
+    # ثبت خودکار کاربر اگر وجود نداشته باشد
+    user = users_col.find_one({"_id": user_id})
+    if not user:
+        user = users_col.find_one({"_id": str(user_id)})
+    
+    if not user:
+        users_col.insert_one({
+            "_id": user_id,
+            "name": name,
+            "joined_at": datetime.now(),
+            "last_activity": datetime.now(),
+            "is_banned": False
+        })
+        logging.info(f"✅ کاربر جدید ثبت شد (از طریق پیام): {user_id} - {name}")
+        user = users_col.find_one({"_id": user_id})
 
-        # بررسی عضویت در کانال
+    # اگر کاربر منو خواست
+    if text == "منو" or text == "menu":
         if not await is_member(user_id):
             await message.answer(
                 "❌ شما عضو کانال ما نیستی!\n"
@@ -933,19 +873,11 @@ async def handle_text(message: types.Message):
                 reply_markup=channel_check_menu()
             )
             return
-
-        # ارسال منوی اصلی
         await message.answer("📋 **منوی اصلی:**", reply_markup=main_menu())
         await log_activity(user_id, "menu", "درخواست منو")
         return
 
-    # ======== بقیه پیام‌ها ========
-    # بررسی اینکه کاربر در دیتابیس ثبت شده یا نه
-    if not users_col.find_one({"_id": user_id}):
-        await message.answer("👋 لطفاً ابتدا /start را بزنید.")
-        return
-
-    # بررسی عضویت
+    # بررسی عضویت برای سایر پیام‌ها
     if not await is_member(user_id):
         await message.answer(
             "❌ شما عضو کانال ما نیستی!\n"
@@ -961,7 +893,7 @@ async def handle_text(message: types.Message):
             await log_activity(user_id, "greeting", f"گفت: {text}")
             return
 
-    # AI
+    # هوش مصنوعی
     ai_response = await ask_ai(text)
     if ai_response:
         await message.answer(ai_response)
@@ -972,7 +904,6 @@ async def handle_text(message: types.Message):
     await message.answer(random.choice(FUNNY_FALLBACKS))
     await log_activity(user_id, "fallback", f"پرسید: {text}")
 
-# ======== وب سرور سلامت ========
 async def health_check(request):
     return web.Response(text="✅ Bot is running!")
 
