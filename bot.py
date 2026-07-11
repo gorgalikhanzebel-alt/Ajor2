@@ -250,6 +250,11 @@ async def send_group_files(message: types.Message, group_uuid: str):
     
     await message.answer("✅ **همه فایل‌های این گروه ارسال شدند!**")
 
+# ======== دستور /test ========
+@dp.message(Command("test"))
+async def test_command(message: types.Message):
+    await message.answer("✅ کد جدید با موفقیت روی سرور اجرا شده است! 🎉")
+
 # ======== دستور /start ========
 @dp.message(Command("start"))
 async def start(message: types.Message):
@@ -570,14 +575,13 @@ async def stats_callback(callback: types.CallbackQuery):
     )
     await callback.answer()
 
-# ======== لیست کاربران (ساده و بدون صفحه‌بندی) ========
+# ======== لیست کاربران ========
 @dp.callback_query(lambda c: c.data == "list_users")
 async def list_users_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
     
-    # گرفتن تمام کاربران (حداکثر ۵۰ نفر اول)
     all_users = list(users_col.find().sort("_id", 1).limit(50))
     
     if not all_users:
@@ -589,11 +593,9 @@ async def list_users_callback(callback: types.CallbackQuery):
     for user in all_users:
         user_id = user["_id"]
         name = user.get("name", "بدون نام")
-        joined = user.get("joined_at", "نامشخص")
         status = "🚫" if user.get("is_banned", False) else "✅"
-        text += f"{status} 🆔 `{user_id}` - {name} (تاریخ ثبت: {joined})\n"
+        text += f"{status} 🆔 `{user_id}` - {name}\n"
     
-    # ارسال لیست
     await callback.message.answer(
         text,
         parse_mode="Markdown",
@@ -850,7 +852,8 @@ async def help_command(message: types.Message):
         "/quote - نقل قول انگیزشی\n"
         "/ping - بررسی وضعیت ربات\n"
         "/admin - پنل ادمین\n"
-        "/cancel - لغو بازی حدس عدد"
+        "/cancel - لغو بازی حدس عدد\n"
+        "/test - تست کد جدید"
     )
 
 @dp.message(Command("profile"))
@@ -906,11 +909,43 @@ async def handle_text(message: types.Message):
         return
 
     user_id = message.from_user.id
+    name = message.from_user.first_name
+    text = message.text.strip().lower()
 
+    # ======== اگر کاربر کلمه "منو" یا "menu" رو فرستاد، مثل /start عمل کن ========
+    if text == "منو" or text == "menu":
+        # ثبت کاربر اگر وجود نداشته باشد
+        if not users_col.find_one({"_id": user_id}):
+            users_col.insert_one({
+                "_id": user_id,
+                "name": name,
+                "joined_at": datetime.now(),
+                "last_activity": datetime.now(),
+                "is_banned": False
+            })
+            logging.info(f"✅ کاربر جدید ثبت شد (از طریق منو): {user_id} - {name}")
+
+        # بررسی عضویت در کانال
+        if not await is_member(user_id):
+            await message.answer(
+                "❌ شما عضو کانال ما نیستی!\n"
+                "لطفاً اول عضو کانال بشو تا بتوانی از ربات استفاده کنی.",
+                reply_markup=channel_check_menu()
+            )
+            return
+
+        # ارسال منوی اصلی
+        await message.answer("📋 **منوی اصلی:**", reply_markup=main_menu())
+        await log_activity(user_id, "menu", "درخواست منو")
+        return
+
+    # ======== بقیه پیام‌ها ========
+    # بررسی اینکه کاربر در دیتابیس ثبت شده یا نه
     if not users_col.find_one({"_id": user_id}):
         await message.answer("👋 لطفاً ابتدا /start را بزنید.")
         return
 
+    # بررسی عضویت
     if not await is_member(user_id):
         await message.answer(
             "❌ شما عضو کانال ما نیستی!\n"
@@ -919,20 +954,21 @@ async def handle_text(message: types.Message):
         )
         return
 
-    text = message.text.strip().lower()
-    
+    # احوال‌پرسی
     for key, response in GREETINGS.items():
         if key in text:
             await message.answer(response)
             await log_activity(user_id, "greeting", f"گفت: {text}")
             return
 
+    # AI
     ai_response = await ask_ai(text)
     if ai_response:
         await message.answer(ai_response)
         await log_activity(user_id, "ai_chat", f"پرسید: {text}")
         return
 
+    # جملات خنده‌دار
     await message.answer(random.choice(FUNNY_FALLBACKS))
     await log_activity(user_id, "fallback", f"پرسید: {text}")
 
