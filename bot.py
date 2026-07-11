@@ -24,13 +24,14 @@ db = client["telegram_bot"]
 users_col = db["users"]
 files_col = db["files"]
 groups_col = db["groups"]
-activities_col = db["activities"]  # برای ذخیره فعالیت‌ها
+activities_col = db["activities"]
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 logging.basicConfig(level=logging.INFO)
 
-ADMIN_ID = int(os.getenv("ADMIN_ID", 466050034))
+# ======== تنظیمات ========
+ADMIN_ID = 466050034  # <-- آیدی شما مستقیماً در کد
 CHANNEL_ID = -1001277492702
 CHANNEL_LINK = "https://t.me/ajor_pareh"
 DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
@@ -109,14 +110,12 @@ async def is_member(user_id: int) -> bool:
         return False
 
 async def log_activity(user_id: int, action: str, details: str = ""):
-    """ثبت فعالیت کاربر در دیتابیس"""
     activities_col.insert_one({
         "user_id": user_id,
         "action": action,
         "details": details,
         "timestamp": datetime.now()
     })
-    # به‌روزرسانی آخرین فعالیت کاربر
     users_col.update_one(
         {"_id": user_id},
         {"$set": {"last_activity": datetime.now()}}
@@ -225,7 +224,6 @@ def channel_check_menu():
     ])
 
 def user_list_menu(users, page=0, per_page=10):
-    """ساخت منوی صفحه‌بندی لیست کاربران"""
     total = len(users)
     start = page * per_page
     end = min(start + per_page, total)
@@ -239,7 +237,6 @@ def user_list_menu(users, page=0, per_page=10):
             callback_data=f"user_detail_{user['_id']}"
         )])
     
-    # دکمه‌های صفحه‌بندی
     nav_buttons = []
     if page > 0:
         nav_buttons.append(InlineKeyboardButton("◀️ قبلی", callback_data=f"users_page_{page-1}"))
@@ -322,6 +319,7 @@ async def start(message: types.Message):
             await message.answer("❌ فایل مورد نظر یافت نشد.")
             return
 
+    # ثبت کاربر در دیتابیس
     if not users_col.find_one({"_id": user_id}):
         users_col.insert_one({
             "_id": user_id,
@@ -330,6 +328,7 @@ async def start(message: types.Message):
             "last_activity": datetime.now(),
             "is_banned": False
         })
+        logging.info(f"✅ کاربر جدید ثبت شد: {user_id} - {name}")
 
     await log_activity(user_id, "start", "استارت ربات")
 
@@ -556,9 +555,23 @@ async def back_game(callback: types.CallbackQuery):
     await callback.message.answer("🔙 منوی بازی:", reply_markup=game_menu())
     await callback.answer()
 
-# ======== پنل ادمین - آمار کلی ========
+# ======== پنل ادمین ========
+@dp.callback_query(lambda c: c.data == "admin_panel")
+async def admin_panel_callback(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    logging.info(f"🔍 کالبک admin_panel از کاربر {user_id} دریافت شد.")
+    
+    if not await is_admin(user_id):
+        logging.warning(f"⛔ کاربر {user_id} دسترسی به پنل ادمین ندارد.")
+        await callback.answer("⛔ شما ادمین نیستید!", show_alert=True)
+        return
+    
+    logging.info(f"✅ کاربر {user_id} ادمین است. نمایش پنل.")
+    await callback.message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
+    await callback.answer()
+
 @dp.callback_query(lambda c: c.data == "stats")
-async def stats(callback: types.CallbackQuery):
+async def stats_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
@@ -583,11 +596,11 @@ async def stats(callback: types.CallbackQuery):
     )
     await callback.answer()
 
-# ======== پنل ادمین - لیست کاربران ========
-user_list_page = {}  # ذخیره صفحه فعلی هر کاربر
+# ======== لیست کاربران ========
+user_list_page = {}
 
 @dp.callback_query(lambda c: c.data == "list_users")
-async def list_users(callback: types.CallbackQuery):
+async def list_users_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
@@ -619,9 +632,9 @@ async def users_page_callback(callback: types.CallbackQuery):
     )
     await callback.answer()
 
-# ======== نمایش جزئیات کاربر ========
+# ======== جزئیات کاربر ========
 @dp.callback_query(lambda c: c.data.startswith("user_detail_"))
-async def user_detail(callback: types.CallbackQuery):
+async def user_detail_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
@@ -632,7 +645,6 @@ async def user_detail(callback: types.CallbackQuery):
         await callback.answer("❌ کاربر یافت نشد!", show_alert=True)
         return
     
-    # گرفتن فعالیت‌های اخیر
     recent_activities = list(activities_col.find({"user_id": user_id}).sort("timestamp", -1).limit(5))
     activity_text = "\n".join([f"• {act['action']} - {act['timestamp']}" for act in recent_activities]) if recent_activities else "هیچ فعالیتی"
     
@@ -655,7 +667,7 @@ async def user_detail(callback: types.CallbackQuery):
 
 # ======== جستجوی کاربر ========
 @dp.callback_query(lambda c: c.data == "search_user")
-async def search_user(callback: types.CallbackQuery):
+async def search_user_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
@@ -665,12 +677,8 @@ async def search_user(callback: types.CallbackQuery):
 
 @dp.message(lambda msg: msg.text and msg.from_user.id == ADMIN_ID)
 async def handle_search_user(message: types.Message):
-    if not await is_admin(message.from_user.id):
-        return
-    
     query = message.text.strip()
     
-    # جستجو بر اساس آیدی
     if query.isdigit():
         user = users_col.find_one({"_id": int(query)})
         if user:
@@ -679,7 +687,6 @@ async def handle_search_user(message: types.Message):
             )
             return
     
-    # جستجو بر اساس نام
     users = list(users_col.find({"name": {"$regex": query, "$options": "i"}}))
     if users:
         text = "📋 **نتایج جستجو:**\n\n"
@@ -689,36 +696,9 @@ async def handle_search_user(message: types.Message):
     else:
         await message.answer("❌ کاربری با این مشخصات پیدا نشد.")
 
-# ======== مدیریت کاربران (بن/آنبن) ========
-@dp.callback_query(lambda c: c.data.startswith("ban_user_"))
-async def ban_user_callback(callback: types.CallbackQuery):
-    if not await is_admin(callback.from_user.id):
-        await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
-        return
-    
-    user_id = int(callback.data.split("_")[2])
-    users_col.update_one({"_id": user_id}, {"$set": {"is_banned": True}})
-    await log_activity(user_id, "banned", f"بن شد توسط ادمین {callback.from_user.id}")
-    await callback.answer("✅ کاربر بن شد!", show_alert=True)
-    await callback.message.delete()
-    await list_users(callback)
-
-@dp.callback_query(lambda c: c.data.startswith("unban_user_"))
-async def unban_user_callback(callback: types.CallbackQuery):
-    if not await is_admin(callback.from_user.id):
-        await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
-        return
-    
-    user_id = int(callback.data.split("_")[2])
-    users_col.update_one({"_id": user_id}, {"$set": {"is_banned": False}})
-    await log_activity(user_id, "unbanned", f"آنبن شد توسط ادمین {callback.from_user.id}")
-    await callback.answer("✅ آنبن شد!", show_alert=True)
-    await callback.message.delete()
-    await list_users(callback)
-
-# ======== مشاهده فعالیت‌های کاربر ========
+# ======== فعالیت‌های کاربر ========
 @dp.callback_query(lambda c: c.data == "user_activities")
-async def user_activities(callback: types.CallbackQuery):
+async def user_activities_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
@@ -728,9 +708,6 @@ async def user_activities(callback: types.CallbackQuery):
 
 @dp.message(lambda msg: msg.text and msg.text.isdigit() and msg.from_user.id == ADMIN_ID)
 async def handle_user_activities(message: types.Message):
-    if not await is_admin(message.from_user.id):
-        return
-    
     user_id = int(message.text)
     user = users_col.find_one({"_id": user_id})
     if not user:
@@ -746,7 +723,7 @@ async def handle_user_activities(message: types.Message):
     for act in activities:
         text += f"🕐 {act['timestamp']}\n➡️ {act['action']} - {act.get('details', '')}\n\n"
     
-    await message.answer(text[:4000])  # محدودیت طول پیام
+    await message.answer(text[:4000])
 
 # ======== شروع آپلود گروه جدید ========
 @dp.callback_query(lambda c: c.data == "upload_file")
@@ -870,7 +847,7 @@ async def handle_file_upload(message: types.Message):
 
 # ======== مدیریت گروه‌ها ========
 @dp.callback_query(lambda c: c.data == "manage_groups")
-async def manage_groups(callback: types.CallbackQuery):
+async def manage_groups_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
@@ -897,7 +874,7 @@ async def manage_groups(callback: types.CallbackQuery):
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data.startswith("group_info_"))
-async def group_info(callback: types.CallbackQuery):
+async def group_info_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
@@ -939,13 +916,20 @@ async def help_command(message: types.Message):
     )
 
 @dp.message(Command("profile"))
-async def profile(message: types.Message):
+async def profile_command(message: types.Message):
     user = users_col.find_one({"_id": message.from_user.id})
+    if not user:
+        await message.answer("❌ شما در دیتابیس ثبت نشده‌اید. لطفاً ابتدا /start را بزنید.")
+        return
     await message.answer(
         f"👤 نام: {message.from_user.full_name}\n"
         f"🆔 آیدی: {message.from_user.id}\n"
-        f"📅 تاریخ ثبت: {user.get('joined_at', 'نامشخص') if user else 'نامشخص'}"
+        f"📅 تاریخ ثبت: {user.get('joined_at', 'نامشخص')}"
     )
+
+@dp.message(Command("id"))
+async def id_command(message: types.Message):
+    await message.answer(f"🆔 آیدی عددی شما:\n<code>{message.from_user.id}</code>", parse_mode="HTML")
 
 @dp.message(Command("time"))
 async def time_command(message: types.Message):
@@ -958,20 +942,16 @@ async def time_command(message: types.Message):
         f"⏰ ساعت: {t.strftime('%H:%M:%S')}"
     )
 
-@dp.message(Command("id"))
-async def id_command(message: types.Message):
-    await message.answer(f"🆔 آیدی عددی شما:\n<code>{message.from_user.id}</code>", parse_mode="HTML")
-
 @dp.message(Command("joke"))
-async def joke(message: types.Message):
+async def joke_command(message: types.Message):
     await message.answer(random.choice(JOKES))
 
 @dp.message(Command("quote"))
-async def quote(message: types.Message):
+async def quote_command(message: types.Message):
     await message.answer(f"💬 {random.choice(QUOTES)}")
 
 @dp.message(Command("ping"))
-async def ping(message: types.Message):
+async def ping_command(message: types.Message):
     await message.answer("✅ ربات آنلاین و سالم است!")
 
 @dp.message(Command("admin"))
@@ -988,6 +968,11 @@ async def handle_text(message: types.Message):
         return
 
     user_id = message.from_user.id
+
+    # بررسی اینکه کاربر در دیتابیس ثبت شده یا نه
+    if not users_col.find_one({"_id": user_id}):
+        await message.answer("👋 لطفاً ابتدا /start را بزنید.")
+        return
 
     if not await is_member(user_id):
         await message.answer(
@@ -1030,7 +1015,8 @@ async def start_web():
 
 async def main():
     await start_web()
-    logging.info("🤖 Starting bot...")
+    logging.info("🤖 ربات در حال اجرا...")
+    logging.info(f"👤 آیدی ادمین: {ADMIN_ID}")
     await dp.start_polling(bot, skip_updates=True)
 
 if __name__ == "__main__":
