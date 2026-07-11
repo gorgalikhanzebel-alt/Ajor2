@@ -570,14 +570,13 @@ async def stats_callback(callback: types.CallbackQuery):
     )
     await callback.answer()
 
-# ======== لیست کاربران (ساده و بدون صفحه‌بندی) ========
+# ======== لیست کاربران ========
 @dp.callback_query(lambda c: c.data == "list_users")
 async def list_users_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
     
-    # گرفتن تمام کاربران (حداکثر ۵۰ نفر اول)
     all_users = list(users_col.find().sort("_id", 1).limit(50))
     
     if not all_users:
@@ -591,9 +590,8 @@ async def list_users_callback(callback: types.CallbackQuery):
         name = user.get("name", "بدون نام")
         joined = user.get("joined_at", "نامشخص")
         status = "🚫" if user.get("is_banned", False) else "✅"
-        text += f"{status} 🆔 `{user_id}` - {name} (تاریخ ثبت: {joined})\n"
+        text += f"{status} 🆔 `{user_id}` - {name}\n"
     
-    # ارسال لیست
     await callback.message.answer(
         text,
         parse_mode="Markdown",
@@ -907,10 +905,26 @@ async def handle_text(message: types.Message):
 
     user_id = message.from_user.id
 
+    # بررسی اینکه کاربر در دیتابیس ثبت شده یا نه
     if not users_col.find_one({"_id": user_id}):
         await message.answer("👋 لطفاً ابتدا /start را بزنید.")
         return
 
+    # ======== قابلیت منو ========
+    text = message.text.strip().lower()
+    if text == "منو" or text == "menu":
+        if not await is_member(user_id):
+            await message.answer(
+                "❌ شما عضو کانال ما نیستی!\n"
+                "لطفاً اول عضو کانال بشو تا بتوانی از ربات استفاده کنی.",
+                reply_markup=channel_check_menu()
+            )
+            return
+        await message.answer("📋 **منوی اصلی:**", reply_markup=main_menu())
+        await log_activity(user_id, "menu", "درخواست منو")
+        return
+
+    # بررسی عضویت
     if not await is_member(user_id):
         await message.answer(
             "❌ شما عضو کانال ما نیستی!\n"
@@ -919,20 +933,21 @@ async def handle_text(message: types.Message):
         )
         return
 
-    text = message.text.strip().lower()
-    
+    # احوال‌پرسی
     for key, response in GREETINGS.items():
         if key in text:
             await message.answer(response)
             await log_activity(user_id, "greeting", f"گفت: {text}")
             return
 
+    # AI
     ai_response = await ask_ai(text)
     if ai_response:
         await message.answer(ai_response)
         await log_activity(user_id, "ai_chat", f"پرسید: {text}")
         return
 
+    # جملات خنده‌دار
     await message.answer(random.choice(FUNNY_FALLBACKS))
     await log_activity(user_id, "fallback", f"پرسید: {text}")
 
