@@ -51,7 +51,7 @@ JOKES = [
     "بهترین زبان برنامه‌نویسی؟ پایتون! 🐍",
     "یک پنگوئن به یخچال نگاه کرد و گفت: چقدر خنک! 😄",
     "چرا ریاضیات غمگینه؟ چون مسائلش بی‌جوابه!",
-    "چی می‌شه اگه نارگیل رو بندازی تو رودخونه؟ آب می‌شه!",
+    "چی می‌شه اگه نارگیل رو بندازی تو رودخونه？ آب می‌شه!",
     "یک گربه به کامپیوتر گفت: منوس! 😹",
     "چرا برنامه‌نویس‌ها عاشق قهوه‌ان؟ چون coffee رو با class constructor یکی می‌دونن! ☕",
     "بهترین شوخی برنامه‌نویسی؟ null pointer exception! 😂",
@@ -540,24 +540,6 @@ async def search_user_callback(callback: types.CallbackQuery):
     await callback.message.answer("🔍 **جستجوی کاربر**\n\nلطفاً آیدی عددی یا نام کاربر را وارد کنید:")
     await callback.answer()
 
-# ======== جستجوی کاربر (اصلاح شده) ========
-@dp.message(lambda msg: msg.text and msg.from_user.id == ADMIN_ID and not msg.text.startswith('/'))
-async def handle_search_user(message: types.Message):
-    query = message.text.strip()
-    if query.isdigit():
-        user = users_col.find_one({"_id": int(query)})
-        if user:
-            await message.answer(f"✅ کاربر پیدا شد!\n🆔 آیدی: {user['_id']}\n📛 نام: {user.get('name', 'نامشخص')}\nوضعیت: {'🚫 بن شده' if user.get('is_banned') else '✅ فعال'}")
-            return
-    users = list(users_col.find({"name": {"$regex": query, "$options": "i"}}))
-    if users:
-        text = "📋 **نتایج جستجو:**\n\n"
-        for u in users[:10]:
-            text += f"🆔 `{u['_id']}` - {u.get('name', 'نامشخص')}\n"
-        await message.answer(text, parse_mode="Markdown")
-    else:
-        await message.answer("❌ کاربری با این مشخصات پیدا نشد.")
-
 @dp.callback_query(lambda c: c.data == "user_activities")
 async def user_activities_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -741,11 +723,8 @@ async def admin_command(message: types.Message):
     await message.answer("⚙️ پنل ادمین:", reply_markup=admin_menu())
 
 # ======== چت اصلی ========
-@dp.message()
+@dp.message(lambda msg: msg.chat.type == "private")
 async def handle_text(message: types.Message):
-    if message.chat.type != "private":
-        return
-
     user_id = message.from_user.id
     text = (message.text or "").strip().lower()
 
@@ -762,12 +741,14 @@ async def handle_text(message: types.Message):
         await message.answer("❌ اول عضو کانال شو:", reply_markup=channel_check_menu())
         return
 
+    # چک کردن کلمات دیکشنری
     for key, response in GREETINGS.items():
         if key in text:
             await message.answer(response)
             await log_activity(user_id, "greeting", text)
             return
 
+    # چک کردن پاسخ هوش مصنوعی
     ai_response = await ask_ai(text)
     if ai_response:
         await message.answer(ai_response)
@@ -776,6 +757,24 @@ async def handle_text(message: types.Message):
 
     await message.answer(random.choice(FUNNY_FALLBACKS))
     await log_activity(user_id, "fallback", text)
+
+# ======== جستجوی کاربر (انتقال به انتهای هندلرهای متنی برای جلوگیری از تداخل با چت ادمین) ========
+@dp.message(lambda msg: msg.text and msg.from_user.id == ADMIN_ID and not msg.text.startswith('/'))
+async def handle_search_user(message: types.Message):
+    query = message.text.strip()
+    if query.isdigit():
+        user = users_col.find_one({"_id": int(query)})
+        if user:
+            await message.answer(f"✅ کاربر پیدا شد!\n🆔 آیدی: {user['_id']}\n📛 نام: {user.get('name', 'نامشخص')}\nوضعیت: {'🚫 بن شده' if user.get('is_banned') else '✅ فعال'}")
+            return
+    users = list(users_col.find({"name": {"$regex": query, "$options": "i"}}))
+    if users:
+        text = "📋 **نتایج جستجو:**\n\n"
+        for u in users[:10]:
+            text += f"🆔 `{u['_id']}` - {u.get('name', 'نامشخص')}\n"
+        await message.answer(text, parse_mode="Markdown")
+    else:
+        await message.answer("❌ کاربری با این مشخصات پیدا نشد.")
 
 # ======== وب سرور ========
 async def health_check(request):
