@@ -95,6 +95,7 @@ GREETINGS = {
 }
 
 guess_games = {}
+user_states = {}  # مدیریت وضعیت برای فعالیت‌های کاربر
 
 async def is_admin(user_id: int) -> bool:
     return user_id == ADMIN_ID
@@ -612,24 +613,33 @@ async def user_activities_callback(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
         return
+    
+    user_states[callback.from_user.id] = "waiting_for_user_id"
     await callback.message.answer("📋 **مشاهده فعالیت‌های کاربر**\n\nلطفاً آیدی عددی کاربر را وارد کنید:")
     await callback.answer()
 
 @dp.message(lambda msg: msg.text and msg.text.isdigit() and msg.from_user.id == ADMIN_ID)
 async def handle_user_activities(message: types.Message):
+    if user_states.get(message.from_user.id) != "waiting_for_user_id":
+        return
+    
     user_id = int(message.text)
     user = users_col.find_one({"_id": user_id})
     if not user:
         await message.answer("❌ کاربر یافت نشد!")
         return
+    
     activities = list(activities_col.find({"user_id": user_id}).sort("timestamp", -1).limit(20))
     if not activities:
         await message.answer("📋 این کاربر هیچ فعالیتی نداشته است.")
         return
+    
     text = f"📋 **فعالیت‌های کاربر {user_id}**\n\n"
     for act in activities:
         text += f"🕐 {act['timestamp']}\n➡️ {act['action']} - {act.get('details', '')}\n\n"
+    
     await message.answer(text[:4000])
+    del user_states[message.from_user.id]
 
 @dp.callback_query(lambda c: c.data == "upload_file")
 async def upload_file_callback(callback: types.CallbackQuery):
