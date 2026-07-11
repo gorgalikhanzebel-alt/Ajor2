@@ -48,7 +48,7 @@ FUNNY_FALLBACKS = [
 
 JOKES = [
     "چرا مرغ از جاده رد شد؟ برای اینکه به اون طرف برسه! 😂",
-    "بهترین زبان برنامه‌نویسی؟ پایتون! 🐍",
+    "بهترین زبان برنامه‌نویسی？ پایتون! 🐍",
     "یک پنگوئن به یخچال نگاه کرد و گفت: چقدر خنک! 😄",
     "چرا ریاضیات غمگینه؟ چون مسائلش بی‌جوابه!",
     "چی می‌شه اگه نارگیل رو بندازی تو رودخونه？ آب می‌شه!",
@@ -741,6 +741,11 @@ async def handle_text(message: types.Message):
         await message.answer("❌ اول عضو کانال شو:", reply_markup=channel_check_menu())
         return
 
+    # پاسخ به کلمه "منو" به جای استارت
+    if text in ["منو", "منوی اصلی", "menu"]:
+        await start(message)
+        return
+
     # چک کردن کلمات دیکشنری
     for key, response in GREETINGS.items():
         if key in text:
@@ -758,7 +763,7 @@ async def handle_text(message: types.Message):
     await message.answer(random.choice(FUNNY_FALLBACKS))
     await log_activity(user_id, "fallback", text)
 
-# ======== جستجوی کاربر (انتقال به انتهای هندلرهای متنی برای جلوگیری از تداخل با چت ادمین) ========
+# ======== جستجوی کاربر ========
 @dp.message(lambda msg: msg.text and msg.from_user.id == ADMIN_ID and not msg.text.startswith('/'))
 async def handle_search_user(message: types.Message):
     query = message.text.strip()
@@ -792,6 +797,24 @@ async def start_web():
 async def main():
     await start_web()
     logging.info("🤖 ربات شروع شد")
+    
+    # 🌟 ثبت مستقیم منوی اسلش‌دار در سرور تلگرام به محض روشن شدن ربات
+    try:
+        await bot.set_my_commands([
+            types.BotCommand(command="start", description="شروع کار با ربات و منوی اصلی"),
+            types.BotCommand(command="help", description="راهنمای استفاده و لیست دستورات"),
+            types.BotCommand(command="profile", description="مشخصات و حساب کاربری"),
+            types.BotCommand(command="time", description="نمایش ساعت رسمی تهران"),
+            types.BotCommand(command="id", description="دریافت آیدی تلگرام شما"),
+            types.BotCommand(command="joke", description="فرستادن یک جوک باحال"),
+            types.BotCommand(command="quote", description="یک جمله انگیزشی زیبا"),
+            types.BotCommand(command="ping", description="تست آنلاین بودن ربات"),
+            types.BotCommand(command="admin", description="ورود به پنل مدیریت (ادمین)"),
+        ])
+        logging.info("✅ منوی دستورات با موفقیت در تلگرام ثبت شد.")
+    except Exception as e:
+        logging.error(f"❌ خطا در ثبت منوی دستورات: {e}")
+        
     await dp.start_polling(bot, skip_updates=True)
 
 if __name__ == "__main__":
