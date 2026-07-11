@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions, BotCommand
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions
 from pymongo import MongoClient
 from aiohttp import web
 from pytube import YouTube
@@ -153,24 +153,6 @@ async def ask_ai(query: str) -> str:
 
 def get_tehran_time():
     return datetime.now(timezone.utc) + timedelta(hours=3, minutes=30)
-
-# ======== ثبت دستورات Slash Menu ========
-async def set_bot_commands():
-    commands = [
-        BotCommand(command="start", description="شروع ربات و نمایش منو"),
-        BotCommand(command="help", description="نمایش لیست دستورات"),
-        BotCommand(command="profile", description="مشاهده پروفایل"),
-        BotCommand(command="time", description="ساعت و تاریخ تهران"),
-        BotCommand(command="id", description="نمایش آیدی عددی شما"),
-        BotCommand(command="joke", description="دریافت جوک تصادفی"),
-        BotCommand(command="quote", description="نقل قول انگیزشی"),
-        BotCommand(command="ping", description="بررسی وضعیت ربات"),
-        BotCommand(command="admin", description="پنل ادمین (فقط ادمین)"),
-        BotCommand(command="cancel", description="لغو بازی حدس عدد"),
-        BotCommand(command="publishgroup", description="انتشار گروه فعلی"),
-    ]
-    await bot.set_my_commands(commands)
-    logging.info("✅ منوی دستورات (/commands) ثبت شد.")
 
 # ======== منوها ========
 def main_menu():
@@ -917,7 +899,8 @@ async def start_web():
 async def main():
     await start_web()
     logging.info("🤖 Starting bot...")
-    await set_bot_commands()
+    # ======== تنظیمات منوی اسلش‌دار به BotFather واگذار شد ========
+    logging.info("⏭ منوی دستورات توسط BotFather مدیریت می‌شود (تنظیمات کد غیرفعال شد).")
     await dp.start_polling(bot, skip_updates=True)
 
 if __name__ == "__main__":
