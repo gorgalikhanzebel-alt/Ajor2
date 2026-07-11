@@ -588,7 +588,6 @@ async def list_users_callback(callback: types.CallbackQuery):
     for user in all_users:
         user_id = user["_id"]
         name = user.get("name", "بدون نام")
-        joined = user.get("joined_at", "نامشخص")
         status = "🚫" if user.get("is_banned", False) else "✅"
         text += f"{status} 🆔 `{user_id}` - {name}\n"
     
@@ -904,15 +903,23 @@ async def handle_text(message: types.Message):
         return
 
     user_id = message.from_user.id
-
-    # بررسی اینکه کاربر در دیتابیس ثبت شده یا نه
-    if not users_col.find_one({"_id": user_id}):
-        await message.answer("👋 لطفاً ابتدا /start را بزنید.")
-        return
-
-    # ======== قابلیت منو ========
+    name = message.from_user.first_name
     text = message.text.strip().lower()
+
+    # ======== اگر کاربر کلمه "منو" یا "menu" رو فرستاد، مثل /start عمل کن ========
     if text == "منو" or text == "menu":
+        # ثبت کاربر اگر وجود نداشته باشد
+        if not users_col.find_one({"_id": user_id}):
+            users_col.insert_one({
+                "_id": user_id,
+                "name": name,
+                "joined_at": datetime.now(),
+                "last_activity": datetime.now(),
+                "is_banned": False
+            })
+            logging.info(f"✅ کاربر جدید ثبت شد (از طریق منو): {user_id} - {name}")
+
+        # بررسی عضویت در کانال
         if not await is_member(user_id):
             await message.answer(
                 "❌ شما عضو کانال ما نیستی!\n"
@@ -920,8 +927,16 @@ async def handle_text(message: types.Message):
                 reply_markup=channel_check_menu()
             )
             return
+
+        # ارسال منوی اصلی
         await message.answer("📋 **منوی اصلی:**", reply_markup=main_menu())
         await log_activity(user_id, "menu", "درخواست منو")
+        return
+
+    # ======== بقیه پیام‌ها ========
+    # بررسی اینکه کاربر در دیتابیس ثبت شده یا نه
+    if not users_col.find_one({"_id": user_id}):
+        await message.answer("👋 لطفاً ابتدا /start را بزنید.")
         return
 
     # بررسی عضویت
