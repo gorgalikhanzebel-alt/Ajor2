@@ -37,7 +37,7 @@ DEFAULT_CAPTION = "📌 عضویت در کانال ما: @ajor_pareh"
 
 OPENROUTER_API_KEY = "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"
 
-# ======== لیست‌ها ========
+# ======== لیست‌ها (به عنوان پشتیبان در صورت قطع بودن هوش مصنوعی) ========
 FUNNY_FALLBACKS = [
     "چی میگی بچه خوشگل؟ 😏",
     "سیک تو بزن تا سیکمو نزدن 😂",
@@ -51,12 +51,7 @@ JOKES = [
     "به دوستم گفتم چرا ورزش نمی‌کنی؟ گفت لباس ورزشی ندارم... گفتم لخت ورزش کن، گفت ورزشگاه راه نمیدن! 😂",
     "معلم گفت با 'احتمالاً' جمله بساز... گفتم بابام روزنامه برد دستشویی، احتمالاً جدول حل می‌کنه! 😂",
     "رفتم بانک گفتم وام می‌خوام... گفت ضامن داری؟ گفتم خودم خیلی به خودم اطمینان دارم! 😂",
-    "به یارو گفتن چرا انقدر تنبلی؟ گفت الان حس ندارم توضیح بدم! 😂",
-    "گوشیم افتاد تو آب... گذاشتمش تو برنج، فرداش سه تا چینی اومدن تعمیرش کردن! 😂",
-    "رفتم عینک‌فروشی گفتم عینک ارزون دارید؟ گفت بله... گفتم خب خودتون بزنید قیمتاتونو ببینید! 😂",
-    "به دوستم گفتم چرا دیر اومدی؟ گفت زود راه افتادم که دیر نرسم... وسط راه دیدم وقت دارم، خوابیدم! 😂",
-    "مامانم گفت برو نون بخر... گفتم هوا سرده، گفت پس دوتا بخر گرم شی! 😂",
-    "از بس پول ندارم وقتی پیام 'موجودی کافی نیست' میاد، به بانک میگم می‌دونم داداش، یادآوری نکن! 😂"
+    "به یارو گفتن چرا انقدر تنبلی؟ گفت الان حس ندارم توضیح بدم! 😂"
 ]
 
 QUOTES = [
@@ -64,12 +59,7 @@ QUOTES = [
     "موفقیت یعنی بلند شدن دوباره!",
     "کد بزن و لذت ببر!",
     "زندگی مثل یه جعبه شکلاته!",
-    "بهترین زمان برای شروع، الان است!",
-    "هیچ چیز غیرممکن نیست، فقط زمان می‌بره! ⏳",
-    "با امید و تلاش، قله‌ها فتح می‌شوند! 🏔️",
-    "لبخند بزن، دنیا لبخند می‌زند! 😊",
-    "هر روز یه فرصت تازه برای شروع دوباره است! 🌅",
-    "موفقیت یعنی بلند شدن هر بار که زمین می‌خوری! 💪"
+    "بهترین زمان برای شروع، الان است!"
 ]
 
 GREETINGS = {
@@ -234,7 +224,7 @@ async def send_group_files(message: types.Message, group_uuid: str):
             logging.error(f"خطا در ارسال فایل {f.get('uuid')}: {e}")
     await message.answer("✅ **همه فایل‌های این گروه ارسال شدند!**")
 
-# ======== دستور /start ========
+# ======== دستورات اصلی ========
 @dp.message(Command("test"))
 async def test_command(message: types.Message):
     await message.answer("✅ کد جدید با موفقیت روی سرور اجرا شده است! 🎉")
@@ -685,7 +675,7 @@ async def group_info_callback(callback: types.CallbackQuery):
     await callback.message.answer(f"📁 **اطلاعات گروه**\nشناسه: `{group_uuid}`\nتعداد فایل‌ها: {len(files)}\n\nفایل‌ها:\n{file_names}")
     await callback.answer()
 
-# ======== دستورات ========
+# ======== دستورات سرگرمی (بروزرسانی شده با هوش مصنوعی) ========
 @dp.message(Command("help"))
 async def help_command(message: types.Message):
     await message.answer("📖 لیست دستورات:\n/start - شروع\n/help - راهنما\n/admin - پنل ادمین\n/activity [آیدی] - فعالیت کاربر")
@@ -705,11 +695,23 @@ async def id_command(message: types.Message):
 
 @dp.message(Command("joke"))
 async def joke_command(message: types.Message):
-    await message.answer(random.choice(JOKES))
+    await message.answer("🔄 در حال ساختن یه جوک باحال و جدید...")
+    ai_joke = await ask_ai("یک جوک جدید، کوتاه و خنده‌دار به زبان فارسی بگو.")
+    if ai_joke:
+        await message.answer(ai_joke)
+        await log_activity(message.from_user.id, "ai_joke", "دریافت جوک از هوش مصنوعی")
+    else:
+        await message.answer(random.choice(JOKES))
 
 @dp.message(Command("quote"))
 async def quote_command(message: types.Message):
-    await message.answer(random.choice(QUOTES))
+    await message.answer("🔄 در حال دریافت یک جمله انگیزشی خاص...")
+    ai_quote = await ask_ai("یک جمله انگیزشی یا مفهومی عمیق، زیبا و کوتاه به زبان فارسی بگو.")
+    if ai_quote:
+        await message.answer(ai_quote)
+        await log_activity(message.from_user.id, "ai_quote", "دریافت جمله انگیزشی از هوش مصنوعی")
+    else:
+        await message.answer(random.choice(QUOTES))
 
 @dp.message(Command("ping"))
 async def ping_command(message: types.Message):
