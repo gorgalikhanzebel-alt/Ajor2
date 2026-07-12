@@ -7,7 +7,14 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions
+from aiogram.types import (
+    InlineKeyboardMarkup, 
+    InlineKeyboardButton, 
+    ChatPermissions, 
+    BotCommand, 
+    BotCommandScopeDefault, 
+    BotCommandScopeAllPrivateChats
+)
 from pymongo import MongoClient
 from aiohttp import web
 from pytube import YouTube
@@ -802,19 +809,25 @@ async def main():
     await start_web()
     logging.info("🤖 ربات شروع شد")
     
-    # ثبت مستقیم منوی اسلش‌دار در سرور تلگرام به محض روشن شدن ربات
+    # ثبت منوی اسلش‌دار با تعیین محدوده دقیق (Scope)
     try:
-        await bot.set_my_commands([
-            types.BotCommand(command="start", description="شروع کار با ربات و منوی اصلی"),
-            types.BotCommand(command="help", description="راهنمای استفاده و لیست دستورات"),
-            types.BotCommand(command="profile", description="مشخصات و حساب کاربری"),
-            types.BotCommand(command="time", description="نمایش ساعت رسمی تهران"),
-            types.BotCommand(command="id", description="دریافت آیدی تلگرام شما"),
-            types.BotCommand(command="joke", description="فرستادن یک جوک باحال"),
-            types.BotCommand(command="quote", description="یک جمله انگیزشی زیبا"),
-            types.BotCommand(command="ping", description="تست آنلاین بودن ربات"),
-            types.BotCommand(command="admin", description="ورود به پنل مدیریت (ادمین)"),
-        ])
+        commands = [
+            BotCommand(command="start", description="شروع کار با ربات و منوی اصلی"),
+            BotCommand(command="help", description="راهنمای استفاده و لیست دستورات"),
+            BotCommand(command="profile", description="مشخصات و حساب کاربری"),
+            BotCommand(command="time", description="نمایش ساعت رسمی تهران"),
+            BotCommand(command="id", description="دریافت آیدی تلگرام شما"),
+            BotCommand(command="joke", description="فرستادن یک جوک باحال"),
+            BotCommand(command="quote", description="یک جمله انگیزشی زیبا"),
+            BotCommand(command="ping", description="تست آنلاین بودن ربات"),
+            BotCommand(command="admin", description="ورود به پنل مدیریت (ادمین)"),
+        ]
+        
+        # ۱. تنظیم برای همه چت‌های خصوصی
+        await bot.set_my_commands(commands, scope=BotCommandScopeAllPrivateChats())
+        # ۲. تنظیم به عنوان پیش‌فرض کلی
+        await bot.set_my_commands(commands, scope=BotCommandScopeDefault())
+        
         logging.info("✅ منوی دستورات با موفقیت در تلگرام ثبت شد.")
     except Exception as e:
         logging.error(f"❌ خطا در ثبت منوی دستورات: {e}")
